@@ -17,4 +17,4 @@ Echo Prompt Manager is an enterprise-grade prompt management system designed for
 Developers can integrate Echo into their AI applications instantly directly from this repository:
 
 ```bash
-pip3 install 'git+https://github.com/xxx0438/stunning-potato.git#subdirectory=echo_sdk_package'
+pip3 install 'git+https://github.com/PeterShanxin/stunning-potato.git#subdirectory=echo_sdk_package'
