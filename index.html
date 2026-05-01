@@ -3,296 +3,804 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Echo Prompt Manager</title>
+  <title>Echo Prompt CMS</title>
   <style>
     :root {
-      --bg: #0f172a;
-      --panel: #111827;
-      --panel2: #0b1220;
-      --border: #243244;
-      --text: #e5e7eb;
-      --muted: #94a3b8;
-      --accent: #60a5fa;
-      --good: #22c55e;
-      --warn: #f59e0b;
-      --bad: #ef4444;
+      --bg: #fafafa;
+      --surface: #ffffff;
+      --surface-2: #f5f5f5;
+      --surface-3: #ececec;
+      --border: #e5e5e5;
+      --border-strong: #cfcfcf;
+      --text: #0a0a0a;
+      --text-muted: #5e5e5e;
+      --text-faint: #9b9b9b;
+      --accent-grad: linear-gradient(135deg, #000 0%, #2c2c2c 50%, #050505 100%);
+      --accent-grad-hover: linear-gradient(135deg, #1a1a1a 0%, #000 50%, #1a1a1a 100%);
+      --hover-grad: linear-gradient(180deg, rgba(0,0,0,0.025) 0%, rgba(0,0,0,0.06) 100%);
+      --row-grad: linear-gradient(90deg, rgba(0,0,0,0.02) 0%, rgba(0,0,0,0.05) 100%);
+      --pass: #157a45;
+      --warn: #a87600;
+      --fail: #ad2a2a;
+      --mono: 'Courier New', 'Courier', ui-monospace, Menlo, Consolas, monospace;
     }
+
     * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
     body {
-      margin: 0;
-      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: linear-gradient(180deg, #0b1020 0%, #0f172a 100%);
+      font-family: var(--mono);
+      background: var(--bg);
       color: var(--text);
-    }
-    header {
-      padding: 20px 24px 12px;
-      border-bottom: 1px solid var(--border);
-      background: rgba(15, 23, 42, 0.85);
-      position: sticky;
-      top: 0;
-      backdrop-filter: blur(10px);
-      z-index: 10;
-    }
-    h1 { margin: 0 0 8px; font-size: 22px; }
-    .sub { color: var(--muted); font-size: 13px; }
-    .topbar {
-      display: grid;
-      grid-template-columns: 1fr auto;
-      gap: 12px;
-      margin-top: 14px;
-      align-items: center;
-    }
-    .api-row { display: flex; gap: 8px; flex-wrap: wrap; }
-    input, select, textarea, button {
-      border-radius: 10px;
-      border: 1px solid var(--border);
-      background: #0b1220;
-      color: var(--text);
-      padding: 10px 12px;
-      font-size: 14px;
-      outline: none;
-    }
-    input, select { min-width: 180px; }
-    textarea { width: 100%; min-height: 110px; resize: vertical; }
-    button {
-      cursor: pointer;
-      background: #172033;
-    }
-    button.primary { background: var(--accent); color: #08111f; border-color: transparent; font-weight: 700; }
-    button.good { background: var(--good); color: #04120a; border-color: transparent; font-weight: 700; }
-    button.warn { background: var(--warn); color: #1a1202; border-color: transparent; font-weight: 700; }
-    button.bad { background: var(--bad); color: #1a0505; border-color: transparent; font-weight: 700; }
-    main { padding: 20px 24px 36px; max-width: 1500px; margin: 0 auto; }
-    .grid { display: grid; gap: 16px; }
-    .grid.cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .grid.cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-    .panel {
-      background: rgba(17, 24, 39, 0.92);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 16px;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-    }
-    .panel h2 { margin: 0 0 12px; font-size: 18px; }
-    .panel h3 { margin: 0 0 10px; font-size: 15px; color: #dbeafe; }
-    .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-    .muted { color: var(--muted); font-size: 13px; }
-    .status {
-      display: inline-block; padding: 3px 8px; border-radius: 999px; font-size: 12px; font-weight: 700;
-      border: 1px solid var(--border); margin-left: 8px;
-    }
-    .status.pass { color: var(--good); }
-    .status.warn { color: var(--warn); }
-    .status.block { color: var(--bad); }
-    table { width: 100%; border-collapse: collapse; }
-    th, td {
-      padding: 10px 8px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
       font-size: 13px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
     }
-    th { color: #bfdbfe; font-weight: 700; }
-    td code { white-space: pre-wrap; word-break: break-word; }
-    .tabs { display: flex; gap: 8px; flex-wrap: wrap; margin: 16px 0; }
-    .tab-btn.active { background: var(--accent); color: #08111f; border-color: transparent; font-weight: 700; }
-    .tab { display: none; }
-    .tab.active { display: block; }
-    .footer-note { margin-top: 14px; color: var(--muted); font-size: 12px; }
-    .two-col { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 16px; }
-    .stack { display: grid; gap: 10px; }
-    .small { font-size: 12px; }
-    .listbox {
-      border: 1px solid var(--border); border-radius: 12px; background: #0b1220; padding: 10px;
-      max-height: 280px; overflow: auto;
+
+    /* Background grid */
+    body::before {
+      content: "";
+      position: fixed; inset: 0;
+      background-image:
+        linear-gradient(rgba(0,0,0,0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,0,0,0.025) 1px, transparent 1px);
+      background-size: 32px 32px;
+      pointer-events: none;
+      z-index: 0;
     }
-    .item { padding: 8px 10px; border-bottom: 1px solid #1f2a3b; cursor: pointer; }
-    .item:last-child { border-bottom: 0; }
-    .item:hover { background: rgba(96,165,250,0.08); }
-    .pill { display:inline-block; padding:2px 8px; border-radius:999px; background:#172033; border:1px solid var(--border); font-size:12px; margin-right:4px; }
-    .json { white-space: pre-wrap; word-break: break-word; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #888; }
+    ::selection { background: #000; color: #fff; }
+
+    /* HEADER */
+    .topbar {
+      position: sticky; top: 0; z-index: 50;
+      background: rgba(250,250,250,0.85);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 28px;
+      display: flex; flex-direction: column; gap: 12px;
+      align-items: stretch;
+      justify-content: space-between;
+    }
+    @media (min-width: 980px) {
+      .topbar { flex-direction: row; align-items: center; }
+    }
+
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .brand-mark {
+      width: 14px; height: 14px;
+      background: var(--accent-grad);
+      border-radius: 3px;
+      box-shadow: 0 0 0 1px rgba(0,0,0,0.08), 0 0 14px rgba(0,0,0,0.18);
+    }
+    .brand-title { font-size: 16px; font-weight: 700; margin: 0; letter-spacing: -0.005em; }
+    .brand-sub { font-size: 10px; color: var(--text-faint); letter-spacing: 0.18em; text-transform: uppercase; margin: 2px 0 0; }
+
+    .header-right { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+    .lang-toggle {
+      display: inline-flex;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 3px;
+    }
+    .lang-toggle button {
+      font-family: var(--mono);
+      background: transparent; border: none;
+      font-size: 11px; font-weight: 700;
+      padding: 5px 12px;
+      color: var(--text-muted); cursor: pointer;
+      border-radius: 5px;
+      transition: all 0.2s ease;
+    }
+    .lang-toggle button:hover { color: var(--text); }
+    .lang-toggle button.active {
+      background: var(--accent-grad);
+      color: #fff;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
+    }
+
+    .toolbar {
+      display: flex; align-items: center; gap: 4px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 4px 6px;
+      flex-wrap: wrap;
+    }
+    .toolbar input {
+      background: transparent; border: none; outline: none;
+      font-family: var(--mono); font-size: 12px;
+      padding: 6px 10px; width: 200px; color: var(--text);
+    }
+    .toolbar input::placeholder { color: var(--text-faint); }
+    .toolbar .divider { width: 1px; height: 16px; background: var(--border); }
+
+    .btn-mini {
+      font-family: var(--mono);
+      font-size: 11px; font-weight: 700;
+      padding: 6px 12px; border-radius: 6px;
+      background: transparent; color: var(--text-muted);
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: all 0.18s ease;
+      letter-spacing: 0.04em;
+    }
+    .btn-mini:hover { background: var(--hover-grad); color: var(--text); }
+    .btn-mini.primary {
+      background: var(--accent-grad);
+      color: #fff;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    }
+    .btn-mini.primary:hover {
+      background: var(--accent-grad-hover);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+    }
+
+    .health-box {
+      font-size: 10px; color: var(--text-faint);
+      padding: 0 8px; min-width: 90px;
+      text-align: right;
+      letter-spacing: 0.04em;
+    }
+    .health-box.flash { color: var(--text); }
+
+    /* MAIN */
+    main {
+      flex: 1; padding: 28px;
+      max-width: 1600px; width: 100%;
+      margin: 0 auto;
+      position: relative; z-index: 1;
+    }
+
+    /* TABS */
+    .tabs {
+      display: inline-flex;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 4px;
+      margin-bottom: 24px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+      flex-wrap: wrap;
+    }
+    .tab-btn {
+      font-family: var(--mono);
+      background: transparent; border: none;
+      font-size: 12px; font-weight: 700;
+      padding: 8px 16px;
+      color: var(--text-muted); cursor: pointer;
+      border-radius: 8px;
+      transition: all 0.2s ease;
+      letter-spacing: 0.02em;
+    }
+    .tab-btn:hover { color: var(--text); background: var(--hover-grad); }
+    .tab-btn.active {
+      background: var(--accent-grad);
+      color: #fff;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.08);
+    }
+
+    .tab { display: none; gap: 22px; }
+    .tab.active { display: grid; grid-template-columns: 1fr; }
+    @media (min-width: 1024px) {
+      .tab.active { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+
+    /* BLOCK */
+    .block {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 22px;
+      display: flex; flex-direction: column; gap: 14px;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+      position: relative;
+    }
+    .block:hover { border-color: var(--border-strong); box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+
+    .block-header {
+      display: flex; align-items: center; gap: 8px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    .block-header::before { content: "#"; color: var(--text-faint); font-weight: 400; }
+    .block-title { font-size: 14px; font-weight: 700; margin: 0; }
+
+    /* INPUTS */
+    .input {
+      width: 100%;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 9px 12px;
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--text);
+      outline: none;
+      transition: all 0.18s ease;
+    }
+    .input::placeholder { color: var(--text-faint); }
+    .input:hover { border-color: var(--border-strong); background: var(--surface); }
+    .input:focus {
+      border-color: var(--text);
+      background: var(--surface);
+      box-shadow: 0 0 0 3px rgba(0,0,0,0.05);
+    }
+    textarea.input { resize: vertical; line-height: 1.55; min-height: 80px; }
+    select.input {
+      appearance: none;
+      -webkit-appearance: none;
+      background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'><path d='M2 4l3 3 3-3' stroke='%23666' stroke-width='1.4' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+      background-repeat: no-repeat;
+      background-position: right 10px center;
+      padding-right: 28px;
+    }
+
+    .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .row-2-span { grid-column: 1 / -1; }
+
+    .check-row {
+      display: flex; align-items: center; gap: 10px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.18s ease;
+      user-select: none;
+    }
+    .check-row:hover { border-color: var(--text); background: var(--surface); }
+    .check-row input[type=checkbox] { width: 14px; height: 14px; accent-color: #000; }
+
+    /* PRIMARY BUTTON with gradient sheen */
+    .btn {
+      width: 100%;
+      font-family: var(--mono);
+      font-size: 13px; font-weight: 700;
+      padding: 12px;
+      border-radius: 10px;
+      border: 1px solid #000;
+      background: var(--accent-grad);
+      color: #fff;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      letter-spacing: 0.03em;
+      position: relative;
+      overflow: hidden;
+    }
+    .btn::after {
+      content: "";
+      position: absolute; inset: 0;
+      background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.18) 50%, transparent 100%);
+      transform: translateX(-110%);
+      transition: transform 0.7s ease;
+    }
+    .btn:hover { box-shadow: 0 4px 14px rgba(0,0,0,0.28); transform: translateY(-1px); }
+    .btn:hover::after { transform: translateX(110%); }
+    .btn:active { transform: translateY(0); }
+
+    .btn-secondary {
+      font-family: var(--mono);
+      font-size: 12px; font-weight: 700;
+      padding: 9px 18px;
+      border-radius: 8px;
+      background: var(--surface);
+      color: var(--text);
+      border: 1px solid var(--border-strong);
+      cursor: pointer;
+      transition: all 0.18s ease;
+      white-space: nowrap;
+    }
+    .btn-secondary:hover { background: var(--accent-grad); color: #fff; border-color: #000; }
+
+    /* LIST PANEL */
+    .list-panel {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow-y: auto;
+      flex: 1;
+      max-height: 540px;
+    }
+
+    .list-item {
+      border-bottom: 1px solid var(--border);
+      padding: 14px 16px;
+      transition: background 0.18s ease;
+    }
+    .list-item:last-child { border-bottom: none; }
+    .list-item.clickable { cursor: pointer; }
+    .list-item.clickable:hover { background: var(--row-grad); }
+
+    .list-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 6px; flex-wrap: wrap; }
+    .list-title { font-weight: 700; font-size: 13px; }
+    .id-tag { color: var(--text-faint); margin-right: 8px; font-weight: 400; }
+    .v-tag { color: var(--text); font-weight: 700; }
+
+    /* PILL */
+    .pill {
+      display: inline-block;
+      padding: 2px 8px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      border: 1px solid var(--border-strong);
+      border-radius: 4px;
+      background: var(--surface);
+      color: var(--text-muted);
+    }
+    .pill.dark { background: var(--accent-grad); color: #fff; border-color: #000; }
+    .pill.pass { color: var(--pass); border-color: var(--pass); background: linear-gradient(135deg, rgba(21,122,69,0.06), rgba(21,122,69,0.12)); }
+    .pill.warn { color: var(--warn); border-color: var(--warn); background: linear-gradient(135deg, rgba(168,118,0,0.06), rgba(168,118,0,0.12)); }
+    .pill.fail { color: var(--fail); border-color: var(--fail); background: linear-gradient(135deg, rgba(173,42,42,0.06), rgba(173,42,42,0.12)); }
+
+    .meta-row {
+      font-size: 11px; color: var(--text-faint);
+      display: flex; gap: 14px; flex-wrap: wrap;
+      margin-top: 4px;
+    }
+    .meta-row .v { color: var(--text); font-weight: 700; }
+
+    .tag {
+      display: inline-block;
+      padding: 1px 6px;
+      font-size: 10px;
+      border: 1px solid var(--border-strong);
+      border-radius: 3px;
+      color: var(--text-muted);
+      background: var(--surface);
+      margin-right: 4px;
+    }
+
+    .desc {
+      font-size: 12px; color: var(--text-muted);
+      margin-top: 4px;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .code-block {
+      background: #0a0a0a;
+      color: #d4d4d4;
+      border: 1px solid #1a1a1a;
+      border-radius: 8px;
+      padding: 12px;
+      font-family: var(--mono);
+      font-size: 11px;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+      margin-top: 10px;
+      line-height: 1.55;
+    }
+
+    .empty { padding: 32px; text-align: center; color: var(--text-faint); font-size: 12px; }
+    .error { padding: 14px 16px; color: var(--fail); font-size: 12px; }
+
+    .action-btn {
+      font-family: var(--mono);
+      font-size: 10px; font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 5px;
+      border: 1px solid var(--border-strong);
+      background: var(--surface);
+      color: var(--text-muted);
+      cursor: pointer;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      transition: all 0.16s ease;
+      white-space: nowrap;
+    }
+    .action-btn:hover { background: var(--accent-grad); color: #fff; border-color: #000; }
+    .action-btn.primary { background: var(--accent-grad); color: #fff; border-color: #000; }
+    .action-btn.primary:hover { background: var(--accent-grad-hover); }
+
+    .filter-row { display: flex; gap: 10px; align-items: stretch; flex-wrap: wrap; }
+    .filter-row .input { flex: 1; min-width: 140px; }
+
+    /* GATE */
+    .gate-result {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 18px;
+      flex: 1;
+      min-height: 320px;
+      font-size: 12px;
+      overflow-y: auto;
+    }
+    .gate-empty { color: var(--text-faint); text-align: center; padding: 80px 0; letter-spacing: 0.08em; }
+    .pulse { animation: pulse 1.4s ease-in-out infinite; color: var(--text-muted); text-align: center; padding: 80px 0; letter-spacing: 0.08em; }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+    .gate-head {
+      display: flex; justify-content: space-between; align-items: center;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 14px; margin-bottom: 14px;
+      flex-wrap: wrap; gap: 8px;
+    }
+    .gate-section-label {
+      font-size: 10px; color: var(--text-faint);
+      letter-spacing: 0.18em; text-transform: uppercase;
+      font-weight: 700; margin-bottom: 6px;
+    }
   </style>
 </head>
 <body>
-<header>
-  <h1>Echo Prompt Manager</h1>
-  <div class="sub">Asset Registry 资产登记 · Version Control 版本管理 · Change Linkage 变更关联 · CI Gate · Execution Logs 留痕复盘</div>
-  <div class="topbar">
-    <div class="api-row">
-      <input id="apiBase" placeholder="API Base URL" value="http://127.0.0.1:8000" />
-      <button onclick="saveApiBase()">Save / 保存</button>
-      <button onclick="refreshAll()">Refresh All / 刷新全部</button>
-      <button onclick="pingHealth()">Health / 健康检查</button>
+
+<header class="topbar">
+  <div class="brand">
+    <div class="brand-mark"></div>
+    <div>
+      <h1 class="brand-title">Echo Prompt CMS</h1>
+      <p class="brand-sub" data-i18n="brandSub">Asset Registry · Version Control · CI Gate</p>
     </div>
-    <div id="healthBox" class="muted">Not Checked / 未检查</div>
+  </div>
+
+  <div class="header-right">
+    <div class="lang-toggle">
+      <button id="langEn" class="active" onclick="setLang('en')">EN</button>
+      <button id="langZh" onclick="setLang('zh')">中</button>
+    </div>
+    <div class="toolbar">
+      <input id="apiBase" placeholder="API Base URL" value="http://127.0.0.1:8000" />
+      <span class="divider"></span>
+      <button class="btn-mini" onclick="saveApiBase()" data-i18n="save">Save</button>
+      <button class="btn-mini primary" onclick="refreshAll()" data-i18n="refresh">Refresh</button>
+      <button class="btn-mini" onclick="pingHealth()" data-i18n="health">Health</button>
+      <span class="divider"></span>
+      <div id="healthBox" class="health-box" data-i18n="ready">Ready</div>
+    </div>
   </div>
 </header>
 
 <main>
   <div class="tabs">
-    <button class="tab-btn active" data-tab="assets" onclick="openTab('assets')">Assets / 资产</button>
-    <button class="tab-btn" data-tab="versions" onclick="openTab('versions')">Versions / 版本</button>
-    <button class="tab-btn" data-tab="changes" onclick="openTab('changes')">Changes / 变更</button>
-    <button class="tab-btn" data-tab="logs" onclick="openTab('logs')">Logs / 日志</button>
-    <button class="tab-btn" data-tab="gate" onclick="openTab('gate')">CI Gate</button>
+    <button class="tab-btn active" data-tab="assets" onclick="openTab('assets')" data-i18n="tabAssets">Assets</button>
+    <button class="tab-btn" data-tab="versions" onclick="openTab('versions')" data-i18n="tabVersions">Versions</button>
+    <button class="tab-btn" data-tab="changes" onclick="openTab('changes')" data-i18n="tabChanges">Changes</button>
+    <button class="tab-btn" data-tab="logs" onclick="openTab('logs')" data-i18n="tabLogs">Logs</button>
+    <button class="tab-btn" data-tab="gate" onclick="openTab('gate')" data-i18n="tabGate">CI Gate</button>
   </div>
 
-  <section id="assets" class="tab active grid cols-2">
-    <div class="panel">
-      <h2>Create Asset / 创建资产</h2>
-      <div class="stack">
-        <input id="assetName" placeholder="Name / 名称, e.g., customer_service_vqa" />
-        <select id="assetType">
+  <!-- ============ ASSETS ============ -->
+  <section id="assets" class="tab active">
+    <div class="block">
+      <div class="block-header"><h2 class="block-title" data-i18n="createAsset">Create Asset</h2></div>
+      <input id="assetName" class="input" data-i18n-ph="assetNamePh" placeholder="Name, e.g., customer_service_vqa" />
+      <select id="assetType" class="input">
+        <option value="prompt">prompt</option>
+        <option value="context_pack">context_pack</option>
+        <option value="skill">skill</option>
+        <option value="workflow">workflow</option>
+      </select>
+      <div class="row-2">
+        <input id="assetOwner" class="input" data-i18n-ph="ownerPh" placeholder="Owner" />
+        <input id="assetTags" class="input" data-i18n-ph="tagsPh" placeholder="Tags (comma separated)" />
+      </div>
+      <textarea id="assetDesc" class="input" data-i18n-ph="descPh" placeholder="Description" style="min-height:120px;"></textarea>
+      <button class="btn" onclick="createAsset()" data-i18n="submitAsset">Submit Asset</button>
+    </div>
+
+    <div class="block">
+      <div class="block-header"><h2 class="block-title" data-i18n="assetList">Asset List</h2></div>
+      <div class="filter-row">
+        <input id="assetSearch" class="input" data-i18n-ph="searchPh" placeholder="Search name/desc/owner..." oninput="loadAssets()" />
+        <select id="assetTypeFilter" class="input" style="flex:0 0 160px;" onchange="loadAssets()">
+          <option value="" data-i18n="allTypes">All Types</option>
           <option value="prompt">prompt</option>
           <option value="context_pack">context_pack</option>
           <option value="skill">skill</option>
           <option value="workflow">workflow</option>
         </select>
-        <input id="assetOwner" placeholder="Owner / 负责人" />
-        <input id="assetTags" placeholder="Tags / 标签, comma separated / 逗号分隔" />
-        <textarea id="assetDesc" placeholder="Description / 描述"></textarea>
-        <button class="primary" onclick="createAsset()">Submit Asset / 提交资产</button>
       </div>
+      <div id="assetsList" class="list-panel"></div>
     </div>
-    <div class="panel">
-      <h2>Asset List / 资产列表</h2>
-      <div class="row" style="margin-bottom:10px;">
-        <input id="assetSearch" placeholder="Search name/desc/owner 搜索名称/描述/负责人" oninput="loadAssets()" />
-        <select id="assetTypeFilter" onchange="loadAssets()">
-          <option value="">All Types / 全部类型</option>
-          <option value="prompt">prompt</option>
-          <option value="context_pack">context_pack</option>
-          <option value="skill">skill</option>
-          <option value="workflow">workflow</option>
+  </section>
+
+  <!-- ============ VERSIONS ============ -->
+  <section id="versions" class="tab">
+    <div class="block">
+      <div class="block-header"><h2 class="block-title" data-i18n="createVersion">Create Version</h2></div>
+      <div class="row-2">
+        <input id="versionAssetId" class="input" placeholder="asset_id" />
+        <input id="versionTag" class="input" data-i18n-ph="versionTagPh" placeholder="version_tag (e.g., v1.0)" />
+      </div>
+      <div class="row-2">
+        <input id="versionCreatedBy" class="input" placeholder="created_by" />
+        <input id="versionChangeSummary" class="input" placeholder="change_summary" />
+      </div>
+      <label class="check-row">
+        <input type="checkbox" id="versionActive" checked />
+        <span data-i18n="setActiveLabel">set_active (activate now)</span>
+      </label>
+      <textarea id="versionSystemPrompt" class="input" data-i18n-ph="systemPromptPh" placeholder="system_prompt" style="min-height:100px;"></textarea>
+      <textarea id="versionContextTemplate" class="input" data-i18n-ph="contextTemplatePh" placeholder="context_template" style="min-height:80px;"></textarea>
+      <div class="row-2">
+        <textarea id="versionWorkflowSpec" class="input" placeholder="workflow_spec (JSON)" style="min-height:80px; font-size:11px;"></textarea>
+        <textarea id="versionExamples" class="input" placeholder="examples (JSON Array)" style="min-height:80px; font-size:11px;"></textarea>
+      </div>
+      <div class="row-2">
+        <textarea id="versionGuardrails" class="input" placeholder="guardrails (JSON Array)" style="min-height:80px; font-size:11px;"></textarea>
+        <textarea id="versionSchema" class="input" placeholder="variables_schema (JSON)" style="min-height:80px; font-size:11px;"></textarea>
+      </div>
+      <button class="btn" onclick="createVersion()" data-i18n="commitVersion">Commit Version</button>
+    </div>
+
+    <div class="block">
+      <div class="block-header"><h2 class="block-title" data-i18n="assetVersions">Asset Versions</h2></div>
+      <div class="filter-row">
+        <input id="versionListAssetId" class="input" data-i18n-ph="queryByAssetIdPh" placeholder="Query by asset_id..." />
+        <button class="btn-secondary" onclick="loadVersions()" data-i18n="loadBtn">Load</button>
+      </div>
+      <div id="versionsList" class="list-panel" style="max-height:600px;"></div>
+    </div>
+  </section>
+
+  <!-- ============ CHANGES ============ -->
+  <section id="changes" class="tab">
+    <div class="block">
+      <div class="block-header"><h2 class="block-title" data-i18n="registerChange">Register Change</h2></div>
+      <div class="row-2">
+        <input id="changeCommitSha" class="input row-2-span" data-i18n-ph="commitShaPh" placeholder="commit_sha (Required)" />
+        <input id="changePrId" class="input" data-i18n-ph="prIdPh" placeholder="pr_id (Optional)" />
+        <input id="changeAssetId" class="input" placeholder="asset_id" />
+        <input id="changeVersionId" class="input" placeholder="asset_version_id" />
+        <input id="changeImpactScope" class="input" data-i18n-ph="impactScopePh" placeholder="impact_scope (comma separated)" />
+        <select id="changeRiskLevel" class="input">
+          <option value="low" data-i18n="riskLow">Low Risk</option>
+          <option value="medium" data-i18n="riskMedium">Medium Risk</option>
+          <option value="high" data-i18n="riskHigh">High Risk</option>
         </select>
-      </div>
-      <div id="assetsList" class="listbox"></div>
-    </div>
-  </section>
-
-  <section id="versions" class="tab grid cols-2">
-    <div class="panel">
-      <h2>Create Version / 创建版本</h2>
-      <div class="stack">
-        <input id="versionAssetId" placeholder="asset_id" />
-        <input id="versionTag" placeholder="version_tag, e.g., v1.0" />
-        <input id="versionCreatedBy" placeholder="created_by / 创建者" />
-        <input id="versionChangeSummary" placeholder="change_summary / 变更摘要" />
-        <label class="small"><input type="checkbox" id="versionActive" checked /> set_active / 设为激活</label>
-        <textarea id="versionSystemPrompt" placeholder="system_prompt / 系统提示词"></textarea>
-        <textarea id="versionContextTemplate" placeholder="context_template / 上下文模板"></textarea>
-        <textarea id="versionWorkflowSpec" placeholder='workflow_spec JSON, e.g., {"steps": []}'></textarea>
-        <textarea id="versionExamples" placeholder='examples JSON array / 示例数组'></textarea>
-        <textarea id="versionGuardrails" placeholder='guardrails JSON array / 护栏数组'></textarea>
-        <textarea id="versionSchema" placeholder='variables_schema JSON / 变量格式'></textarea>
-        <button class="primary" onclick="createVersion()">Submit Version / 提交版本</button>
-      </div>
-    </div>
-    <div class="panel">
-      <h2>Asset Versions / 资产版本</h2>
-      <div class="row" style="margin-bottom:10px;">
-        <input id="versionListAssetId" placeholder="asset_id" />
-        <button onclick="loadVersions()">Load / 加载</button>
-      </div>
-      <div id="versionsList" class="listbox"></div>
-    </div>
-  </section>
-
-  <section id="changes" class="tab grid cols-2">
-    <div class="panel">
-      <h2>Register Change / 登记变更</h2>
-      <div class="stack">
-        <input id="changeCommitSha" placeholder="commit_sha" />
-        <input id="changePrId" placeholder="pr_id (optional / 可选)" />
-        <input id="changeAssetId" placeholder="asset_id" />
-        <input id="changeVersionId" placeholder="asset_version_id" />
-        <select id="changeRiskLevel">
-          <option value="low">low / 低风险</option>
-          <option value="medium">medium / 中风险</option>
-          <option value="high">high / 高风险</option>
+        <select id="changeReviewRequired" class="input">
+          <option value="false" data-i18n="reviewNo">Review: Not Required</option>
+          <option value="true" data-i18n="reviewYes">Review: Required</option>
         </select>
-        <select id="changeReviewRequired">
-          <option value="false">review_required = false / 无需审核</option>
-          <option value="true">review_required = true / 需要审核</option>
+        <select id="changeReviewStatus" class="input row-2-span">
+          <option value="pending" data-i18n="statusPending">Status: Pending</option>
+          <option value="approved" data-i18n="statusApproved">Status: Approved</option>
+          <option value="rejected" data-i18n="statusRejected">Status: Rejected</option>
+          <option value="skipped" data-i18n="statusSkipped">Status: Skipped</option>
         </select>
-        <select id="changeReviewStatus">
-          <option value="pending">pending / 待处理</option>
-          <option value="approved">approved / 已通过</option>
-          <option value="rejected">rejected / 已拒绝</option>
-          <option value="skipped">skipped / 已跳过</option>
-        </select>
-        <input id="changeCreatedBy" placeholder="created_by / 创建者" />
-        <input id="changeImpactScope" placeholder="impact_scope, comma separated / 影响范围" />
-        <textarea id="changeNotes" placeholder="notes / 备注"></textarea>
-        <button class="primary" onclick="createChange()">Submit Change / 提交变更</button>
+        <input id="changeCreatedBy" class="input row-2-span" placeholder="created_by" />
       </div>
+      <textarea id="changeNotes" class="input" data-i18n-ph="notesPh" placeholder="notes" style="min-height:80px;"></textarea>
+      <button class="btn" onclick="createChange()" data-i18n="linkChange">Link Change</button>
     </div>
-    <div class="panel">
-      <h2>View Changes / 查看变更</h2>
-      <div class="row" style="margin-bottom:10px;">
-        <input id="changeLookup" placeholder="commit_sha" />
-        <button onclick="loadChange()">Search / 查询</button>
-        <button onclick="loadChanges()">Refresh List / 刷新列表</button>
+
+    <div class="block">
+      <div class="block-header"><h2 class="block-title" data-i18n="viewChanges">View Changes</h2></div>
+      <div class="filter-row">
+        <input id="changeLookup" class="input" data-i18n-ph="findByCommitPh" placeholder="Find by commit_sha..." />
+        <button class="btn-secondary" onclick="loadChange()" data-i18n="searchBtn">Search</button>
+        <button class="btn-secondary" onclick="loadChanges()" data-i18n="refreshList">Refresh List</button>
       </div>
-      <div id="changeDetail" class="listbox" style="margin-bottom:12px;"></div>
-      <div id="changesList" class="listbox"></div>
+      <div id="changeDetail"></div>
+      <div id="changesList" class="list-panel" style="max-height:480px;"></div>
     </div>
   </section>
 
-  <section id="logs" class="tab grid cols-2">
-    <div class="panel">
-      <h2>Record Log / 写入日志</h2>
-      <div class="stack">
-        <input id="logVersionId" placeholder="asset_version_id" />
-        <input id="logRequestId" placeholder="request_id (optional / 可选)" />
-        <input id="logModelName" placeholder="model_name / 模型名称" />
-        <input id="logCreatedBy" placeholder="created_by / 创建者" />
-        <input id="logLatency" placeholder="latency_ms / 延迟(毫秒)" type="number" />
-        <input id="logTokens" placeholder="token_usage / Token 用量" type="number" />
-        <textarea id="logInputVars" placeholder='input_variables JSON, e.g., {"user_input":"help"}'></textarea>
-        <textarea id="logOutput" placeholder="llm_output / 模型输出"></textarea>
-        <button class="primary" onclick="createLog()">Submit Log / 提交日志</button>
+  <!-- ============ LOGS ============ -->
+  <section id="logs" class="tab">
+    <div class="block">
+      <div class="block-header"><h2 class="block-title" data-i18n="recordLog">Record Log</h2></div>
+      <div class="row-2">
+        <input id="logVersionId" class="input" placeholder="asset_version_id" />
+        <input id="logRequestId" class="input" data-i18n-ph="requestIdOptPh" placeholder="req_id (optional)" />
+        <input id="logModelName" class="input row-2-span" data-i18n-ph="modelNamePh" placeholder="model_name (e.g., gpt-4o)" />
+        <input id="logLatency" type="number" class="input" data-i18n-ph="latencyPh" placeholder="latency (ms)" />
+        <input id="logTokens" type="number" class="input" data-i18n-ph="tokensPh" placeholder="tokens usage" />
+        <input id="logCreatedBy" class="input row-2-span" placeholder="created_by" />
       </div>
+      <textarea id="logInputVars" class="input" placeholder="input_variables (JSON)" style="min-height:80px; font-size:11px;"></textarea>
+      <textarea id="logOutput" class="input" data-i18n-ph="llmOutputPh" placeholder="llm_output" style="min-height:100px;"></textarea>
+      <button class="btn" onclick="createLog()" data-i18n="writeLog">Write Log</button>
     </div>
-    <div class="panel">
-      <h2>Execution Logs / 执行日志</h2>
-      <div class="row" style="margin-bottom:10px;">
-        <input id="logsFilterVersionId" placeholder="asset_version_id (optional / 可选)" />
-        <input id="logsFilterRequestId" placeholder="request_id (optional / 可选)" />
-        <button onclick="loadLogs()">Load / 加载</button>
+
+    <div class="block">
+      <div class="block-header"><h2 class="block-title" data-i18n="executionLogs">Execution Logs</h2></div>
+      <div class="filter-row">
+        <input id="logsFilterVersionId" class="input" data-i18n-ph="filterVersionIdPh" placeholder="Filter by version_id..." />
+        <input id="logsFilterRequestId" class="input" data-i18n-ph="filterRequestIdPh" placeholder="Filter by request_id..." />
+        <button class="btn-secondary" onclick="loadLogs()" data-i18n="filterBtn">Filter</button>
       </div>
-      <div id="logsList" class="listbox"></div>
+      <div id="logsList" class="list-panel" style="max-height:600px;"></div>
     </div>
   </section>
 
-  <section id="gate" class="tab grid cols-2">
-    <div class="panel">
-      <h2>CI Gate Check / CI 拦截检查</h2>
-      <div class="stack">
-        <input id="gateCommitSha" placeholder="commit_sha" />
-        <label class="small"><input type="checkbox" id="gateAiRelated" checked /> is_ai_related / 是否 AI 相关</label>
-        <button class="primary" onclick="checkGate()">Run Check / 运行检查</button>
+  <!-- ============ GATE ============ -->
+  <section id="gate" class="tab">
+    <div class="block">
+      <div class="block-header"><h2 class="block-title" data-i18n="ciGateSim">CI Gate Simulator</h2></div>
+      <input id="gateCommitSha" class="input" data-i18n-ph="pasteCommitPh" placeholder="Paste commit_sha to test..." />
+      <label class="check-row">
+        <input type="checkbox" id="gateAiRelated" checked />
+        <span data-i18n="gateAiRelatedLabel">Commit contains AI-related changes</span>
+      </label>
+      <button class="btn" onclick="checkGate()" data-i18n="runPipeline">Run Pipeline Check</button>
+    </div>
+
+    <div class="block">
+      <div class="block-header"><h2 class="block-title" data-i18n="pipelineResult">Pipeline Result</h2></div>
+      <div id="gateResult" class="gate-result">
+        <div class="gate-empty" data-i18n="awaiting">Awaiting execution...</div>
       </div>
     </div>
-    <div class="panel">
-      <h2>Check Results / 检查结果</h2>
-      <div id="gateResult" class="listbox"></div>
-    </div>
   </section>
-
-  <div class="footer-note">
-    Ensure FastAPI backend is running; defaults to <code>http://127.0.0.1:8000</code>. <br>
-    请确保 FastAPI 后端已运行；默认读取地址为 <code>http://127.0.0.1:8000</code>。
-  </div>
 </main>
 
 <script>
-  const state = {
-    apiBase: localStorage.getItem('echo_api_base') || 'http://127.0.0.1:8000'
+  /* ========== I18N ========== */
+  const I18N = {
+    en: {
+      brandSub: "Asset Registry · Version Control · CI Gate",
+      save: "Save", refresh: "Refresh", health: "Health", ready: "Ready",
+      tabAssets: "Assets", tabVersions: "Versions", tabChanges: "Changes",
+      tabLogs: "Logs", tabGate: "CI Gate",
+      createAsset: "Create Asset", assetList: "Asset List",
+      assetNamePh: "Name, e.g., customer_service_vqa",
+      ownerPh: "Owner", tagsPh: "Tags (comma separated)",
+      descPh: "Description", submitAsset: "Submit Asset",
+      searchPh: "Search name/desc/owner...", allTypes: "All Types",
+      createVersion: "Create Version", assetVersions: "Asset Versions",
+      versionTagPh: "version_tag (e.g., v1.0)",
+      setActiveLabel: "set_active (activate now)",
+      systemPromptPh: "system_prompt", contextTemplatePh: "context_template",
+      commitVersion: "Commit Version", queryByAssetIdPh: "Query by asset_id...",
+      loadBtn: "Load",
+      registerChange: "Register Change", viewChanges: "View Changes",
+      commitShaPh: "commit_sha (Required)", prIdPh: "pr_id (Optional)",
+      impactScopePh: "impact_scope (comma separated)",
+      riskLow: "Low Risk", riskMedium: "Medium Risk", riskHigh: "High Risk",
+      reviewNo: "Review: Not Required", reviewYes: "Review: Required",
+      statusPending: "Status: Pending", statusApproved: "Status: Approved",
+      statusRejected: "Status: Rejected", statusSkipped: "Status: Skipped",
+      notesPh: "notes", linkChange: "Link Change",
+      findByCommitPh: "Find by commit_sha...", searchBtn: "Search",
+      refreshList: "Refresh List",
+      recordLog: "Record Log", executionLogs: "Execution Logs",
+      requestIdOptPh: "req_id (optional)", modelNamePh: "model_name (e.g., gpt-4o)",
+      latencyPh: "latency (ms)", tokensPh: "tokens usage",
+      llmOutputPh: "llm_output", writeLog: "Write Log",
+      filterVersionIdPh: "Filter by version_id...",
+      filterRequestIdPh: "Filter by request_id...", filterBtn: "Filter",
+      ciGateSim: "CI Gate Simulator", pasteCommitPh: "Paste commit_sha to test...",
+      gateAiRelatedLabel: "Commit contains AI-related changes",
+      runPipeline: "Run Pipeline Check", pipelineResult: "Pipeline Result",
+      awaiting: "Awaiting execution...",
+      runningCheck: "Running check...",
+      noAssets: "No assets found", noVersions: "No versions found",
+      noChanges: "No changes found", noLogs: "No logs found",
+      loadFailed: "Load failed", queryFailed: "Query failed", checkFailed: "Check failed",
+      noDescription: "No description",
+      activate: "Activate", use: "Use",
+      apiBaseSaved: "API Base saved",
+      apiOk: "API OK", apiError: "API Error",
+      dashRefreshed: "Dashboard refreshed",
+      assetCreated: "Asset created",
+      versionCreated: "Version created",
+      versionActivated: "Version activated",
+      changeRegistered: "Change registered",
+      logRecorded: "Log recorded",
+      selectedAsset: "Selected Asset",
+      selectedVersion: "Selected Version",
+      failCreateAsset: "Failed to create asset",
+      failCreateVersion: "Failed to create version",
+      failActivate: "Activation failed",
+      failRegister: "Failed to register",
+      failLog: "Failed to log",
+      ownerLabel: "Owner", byLabel: "By", summaryLabel: "Summary",
+      targetSha: "Target SHA", reasons: "Reasons", linkedCR: "Linked Change Request",
+      scopeLabel: "Scope"
+    },
+    zh: {
+      brandSub: "资产登记 · 版本控制 · CI 拦截",
+      save: "保存", refresh: "刷新", health: "健康", ready: "就绪",
+      tabAssets: "资产", tabVersions: "版本", tabChanges: "变更",
+      tabLogs: "日志", tabGate: "CI 拦截",
+      createAsset: "创建资产", assetList: "资产大盘",
+      assetNamePh: "名称，例如 customer_service_vqa",
+      ownerPh: "负责人", tagsPh: "标签（英文逗号分隔）",
+      descPh: "描述", submitAsset: "提交资产",
+      searchPh: "搜索名称 / 描述 / 负责人...", allTypes: "全部类型",
+      createVersion: "发布新版本", assetVersions: "版本历史",
+      versionTagPh: "version_tag（例如 v1.0）",
+      setActiveLabel: "set_active（立即激活）",
+      systemPromptPh: "system_prompt / 系统提示词",
+      contextTemplatePh: "context_template / 上下文模板",
+      commitVersion: "提交版本", queryByAssetIdPh: "按 asset_id 查询...",
+      loadBtn: "加载",
+      registerChange: "关联代码提交", viewChanges: "变更追踪",
+      commitShaPh: "commit_sha（必填）", prIdPh: "pr_id（可选）",
+      impactScopePh: "impact_scope（英文逗号分隔）",
+      riskLow: "低风险", riskMedium: "中风险", riskHigh: "高风险",
+      reviewNo: "评审:不需要", reviewYes: "评审:必需",
+      statusPending: "状态:待审", statusApproved: "状态:通过",
+      statusRejected: "状态:拒绝", statusSkipped: "状态:跳过",
+      notesPh: "notes / 备注说明", linkChange: "关联变更",
+      findByCommitPh: "按 commit_sha 查找...", searchBtn: "搜索",
+      refreshList: "刷新列表",
+      recordLog: "模拟调用写入", executionLogs: "线上排障",
+      requestIdOptPh: "req_id（可选）", modelNamePh: "model_name（例如 gpt-4o）",
+      latencyPh: "latency（毫秒）", tokensPh: "tokens 用量",
+      llmOutputPh: "llm_output / 模型返回结果", writeLog: "写入日志",
+      filterVersionIdPh: "按 version_id 过滤...",
+      filterRequestIdPh: "按 request_id 过滤...", filterBtn: "过滤",
+      ciGateSim: "流水线拦截模拟", pasteCommitPh: "粘贴 commit_sha 进行测试...",
+      gateAiRelatedLabel: "Commit 包含 AI 相关变更",
+      runPipeline: "运行流水线检查", pipelineResult: "检查报告",
+      awaiting: "等待执行...",
+      runningCheck: "正在检查...",
+      noAssets: "未找到资产", noVersions: "未找到版本",
+      noChanges: "未找到变更", noLogs: "未找到日志",
+      loadFailed: "加载失败", queryFailed: "查询失败", checkFailed: "检查失败",
+      noDescription: "暂无描述",
+      activate: "激活", use: "使用",
+      apiBaseSaved: "API Base 已保存",
+      apiOk: "API 正常", apiError: "API 异常",
+      dashRefreshed: "看板已刷新",
+      assetCreated: "资产创建成功",
+      versionCreated: "版本创建成功",
+      versionActivated: "版本已激活",
+      changeRegistered: "变更已登记",
+      logRecorded: "日志已记录",
+      selectedAsset: "已选择资产",
+      selectedVersion: "已选择版本",
+      failCreateAsset: "资产创建失败",
+      failCreateVersion: "版本创建失败",
+      failActivate: "激活失败",
+      failRegister: "登记失败",
+      failLog: "日志写入失败",
+      ownerLabel: "负责人", byLabel: "作者", summaryLabel: "摘要",
+      targetSha: "目标 SHA", reasons: "判定原因", linkedCR: "关联变更请求",
+      scopeLabel: "范围"
+    }
   };
+
+  let currentLang = localStorage.getItem('echo_lang') || 'en';
+  function t(k) { return (I18N[currentLang] && I18N[currentLang][k]) || I18N.en[k] || k; }
+
+  function applyI18n() {
+    document.documentElement.lang = currentLang === 'zh' ? 'zh-CN' : 'en';
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+      el.textContent = t(el.dataset.i18n);
+    });
+    document.querySelectorAll('[data-i18n-ph]').forEach(el => {
+      el.placeholder = t(el.dataset.i18nPh);
+    });
+    document.getElementById('langEn').classList.toggle('active', currentLang === 'en');
+    document.getElementById('langZh').classList.toggle('active', currentLang === 'zh');
+  }
+
+  function setLang(lang) {
+    currentLang = lang;
+    localStorage.setItem('echo_lang', lang);
+    applyI18n();
+    // Re-render dynamic content so list labels update too
+    refreshAllSilent();
+  }
+
+  /* ========== STATE ========== */
+  const state = { apiBase: localStorage.getItem('echo_api_base') || 'http://127.0.0.1:8000' };
   document.getElementById('apiBase').value = state.apiBase;
 
   function saveApiBase() {
     state.apiBase = document.getElementById('apiBase').value.trim().replace(/\/$/, '');
     localStorage.setItem('echo_api_base', state.apiBase);
-    toast('API Base saved / API 地址已保存: ' + state.apiBase);
+    toast(t('apiBaseSaved') + ': ' + state.apiBase);
   }
 
   function openTab(name) {
@@ -303,8 +811,10 @@
   }
 
   function toast(msg) {
-    console.log(msg);
-    document.getElementById('healthBox').textContent = msg;
+    const box = document.getElementById('healthBox');
+    box.textContent = msg;
+    box.classList.add('flash');
+    setTimeout(() => box.classList.remove('flash'), 2000);
   }
 
   function joinTags(value) {
@@ -326,7 +836,7 @@
     let data;
     try { data = text ? JSON.parse(text) : {}; } catch { data = { raw: text }; }
     if (!res.ok) {
-      const msg = data?.detail || data?.message || JSON.stringify(data);
+      const msg = (data && (data.detail || data.message)) || JSON.stringify(data);
       throw new Error(msg);
     }
     return data;
@@ -334,18 +844,22 @@
 
   async function pingHealth() {
     try {
-      const data = await request('/health');
-      document.getElementById('healthBox').textContent = 'Health OK: ' + JSON.stringify(data);
+      await request('/health');
+      document.getElementById('healthBox').textContent = t('apiOk') + ' ✓';
     } catch (e) {
-      document.getElementById('healthBox').textContent = 'Health Check Failed / 检查失败: ' + e.message;
+      document.getElementById('healthBox').textContent = t('apiError') + ' ✗';
     }
   }
 
   async function refreshAll() {
     await Promise.allSettled([loadAssets(), loadChanges(), loadLogs()]);
-    toast('Refreshed All / 已刷新全部');
+    toast(t('dashRefreshed'));
+  }
+  async function refreshAllSilent() {
+    await Promise.allSettled([loadAssets(), loadChanges(), loadLogs()]);
   }
 
+  /* ========== ASSETS ========== */
   async function createAsset() {
     try {
       const payload = {
@@ -357,9 +871,9 @@
       };
       await request('/api/assets/', { method: 'POST', body: JSON.stringify(payload) });
       await loadAssets();
-      toast('Asset created successfully / 资产创建成功');
+      toast(t('assetCreated'));
     } catch (e) {
-      alert('Failed to create asset / 资产创建失败: ' + e.message);
+      alert(t('failCreateAsset') + ': ' + e.message);
     }
   }
 
@@ -373,19 +887,24 @@
       const data = await request('/api/assets/' + (params.toString() ? ('?' + params.toString()) : ''));
       const box = document.getElementById('assetsList');
       if (!data.length) {
-        box.innerHTML = '<div class="muted">No assets found / 暂无资产</div>';
+        box.innerHTML = `<div class="empty">${t('noAssets')}</div>`;
         return;
       }
       box.innerHTML = data.map(a => `
-        <div class="item" onclick="fillAsset(${a.id}, '${escapeHtml(a.name)}')">
-          <div><strong>#${a.id}</strong> ${escapeHtml(a.name)} <span class="pill">${escapeHtml(a.asset_type)}</span></div>
-          <div class="muted">Owner: ${escapeHtml(a.owner || '')}</div>
-          <div class="muted">Tags: ${(a.tags || []).map(t => `<span class="pill">${escapeHtml(t)}</span>`).join(' ')}</div>
-          <div class="muted">${escapeHtml(a.description || '')}</div>
+        <div class="list-item clickable" onclick="fillAsset(${a.id}, '${escapeJs(a.name)}')">
+          <div class="list-row">
+            <div class="list-title"><span class="id-tag">#${a.id}</span>${escapeHtml(a.name)}</div>
+            <span class="pill">${escapeHtml(a.asset_type)}</span>
+          </div>
+          <div class="meta-row">
+            <span>${t('ownerLabel')}: <span class="v">${escapeHtml(a.owner || '-')}</span></span>
+            <span>${(a.tags || []).map(tg => `<span class="tag">${escapeHtml(tg)}</span>`).join('')}</span>
+          </div>
+          <div class="desc">${escapeHtml(a.description || t('noDescription'))}</div>
         </div>
       `).join('');
     } catch (e) {
-      document.getElementById('assetsList').innerHTML = `<div class="muted">Failed to load / 加载失败: ${escapeHtml(e.message)}</div>`;
+      document.getElementById('assetsList').innerHTML = `<div class="error">${t('loadFailed')}: ${escapeHtml(e.message)}</div>`;
     }
   }
 
@@ -393,9 +912,10 @@
     document.getElementById('versionAssetId').value = id;
     document.getElementById('versionListAssetId').value = id;
     document.getElementById('changeAssetId').value = id;
-    toast(`Selected asset / 已选中资产 #${id} ${name}`);
+    toast(`${t('selectedAsset')} #${id}`);
   }
 
+  /* ========== VERSIONS ========== */
   async function createVersion() {
     try {
       const assetId = parseInt(document.getElementById('versionAssetId').value, 10);
@@ -413,54 +933,64 @@
       };
       await request(`/api/assets/${assetId}/versions/`, { method: 'POST', body: JSON.stringify(payload) });
       await loadVersions();
-      toast('Version created successfully / 版本创建成功');
+      toast(t('versionCreated'));
     } catch (e) {
-      alert('Failed to create version / 版本创建失败: ' + e.message);
+      alert(t('failCreateVersion') + ': ' + e.message);
     }
   }
 
   async function loadVersions() {
     try {
       const assetId = parseInt(document.getElementById('versionListAssetId').value, 10);
+      if (!Number.isFinite(assetId)) return;
       const data = await request(`/api/assets/${assetId}/versions/`);
       const box = document.getElementById('versionsList');
       if (!data.length) {
-        box.innerHTML = '<div class="muted">No versions found / 暂无版本</div>';
+        box.innerHTML = `<div class="empty">${t('noVersions')}</div>`;
         return;
       }
       box.innerHTML = data.map(v => `
-        <div class="item">
-          <div><strong>#${v.id}</strong> ${escapeHtml(v.version_tag)} <span class="pill">${escapeHtml(v.status)}</span></div>
-          <div class="muted">Created by: ${escapeHtml(v.created_by || '')}</div>
-          <div class="muted">Summary: ${escapeHtml(v.change_summary || '')}</div>
-          <div class="row" style="margin-top:8px;">
-            <button onclick="activateVersion(${v.asset_id}, ${v.id})">Activate / 激活</button>
-            <button onclick="fillVersionIds(${v.id})">Use in forms / 填入表单</button>
+        <div class="list-item">
+          <div class="list-row">
+            <div class="list-title">
+              <span class="id-tag">#${v.id}</span>
+              <span class="v-tag">${escapeHtml(v.version_tag)}</span>
+              <span class="pill ${v.status === 'active' ? 'pass' : ''}" style="margin-left:8px;">${escapeHtml(v.status)}</span>
+            </div>
+            <div style="display:flex; gap:6px;">
+              <button class="action-btn" onclick="activateVersion(${v.asset_id}, ${v.id})">${t('activate')}</button>
+              <button class="action-btn primary" onclick="fillVersionIds(${v.id})">${t('use')}</button>
+            </div>
           </div>
-          <div class="json small muted" style="margin-top:8px;">${escapeHtml(JSON.stringify(v, null, 2))}</div>
+          <div class="meta-row">
+            <span>${t('byLabel')}: <span class="v">${escapeHtml(v.created_by || '-')}</span></span>
+            <span>${t('summaryLabel')}: <span class="v">${escapeHtml(v.change_summary || '-')}</span></span>
+          </div>
+          <pre class="code-block">${escapeHtml(JSON.stringify(v, null, 2))}</pre>
         </div>
       `).join('');
     } catch (e) {
-      document.getElementById('versionsList').innerHTML = `<div class="muted">Failed to load / 加载失败: ${escapeHtml(e.message)}</div>`;
+      document.getElementById('versionsList').innerHTML = `<div class="error">${t('loadFailed')}: ${escapeHtml(e.message)}</div>`;
     }
   }
 
   function fillVersionIds(versionId) {
     document.getElementById('changeVersionId').value = versionId;
     document.getElementById('logVersionId').value = versionId;
-    toast(`Selected version / 已选中版本 #${versionId}`);
+    toast(`${t('selectedVersion')} #${versionId}`);
   }
 
   async function activateVersion(assetId, versionId) {
     try {
       await request(`/api/assets/${assetId}/versions/${versionId}/activate`, { method: 'POST' });
       await loadVersions();
-      toast('Version activated successfully / 版本已激活');
+      toast(t('versionActivated'));
     } catch (e) {
-      alert('Activation failed / 激活失败: ' + e.message);
+      alert(t('failActivate') + ': ' + e.message);
     }
   }
 
+  /* ========== CHANGES ========== */
   async function createChange() {
     try {
       const payload = {
@@ -477,9 +1007,9 @@
       };
       await request('/api/changes/', { method: 'POST', body: JSON.stringify(payload) });
       await loadChanges();
-      toast('Change registered successfully / 变更已登记');
+      toast(t('changeRegistered'));
     } catch (e) {
-      alert('Failed to register change / 登记变更失败: ' + e.message);
+      alert(t('failRegister') + ': ' + e.message);
     }
   }
 
@@ -487,9 +1017,9 @@
     try {
       const sha = document.getElementById('changeLookup').value.trim();
       const data = await request(`/api/changes/${encodeURIComponent(sha)}`);
-      document.getElementById('changeDetail').innerHTML = `<div class="json">${escapeHtml(JSON.stringify(data, null, 2))}</div>`;
+      document.getElementById('changeDetail').innerHTML = `<pre class="code-block">${escapeHtml(JSON.stringify(data, null, 2))}</pre>`;
     } catch (e) {
-      document.getElementById('changeDetail').innerHTML = `<div class="muted">Query failed / 查询失败: ${escapeHtml(e.message)}</div>`;
+      document.getElementById('changeDetail').innerHTML = `<div class="error">${t('queryFailed')}: ${escapeHtml(e.message)}</div>`;
     }
   }
 
@@ -498,21 +1028,37 @@
       const data = await request('/api/changes/');
       const box = document.getElementById('changesList');
       if (!data.length) {
-        box.innerHTML = '<div class="muted">No changes found / 暂无变更</div>';
+        box.innerHTML = `<div class="empty">${t('noChanges')}</div>`;
         return;
       }
-      box.innerHTML = data.map(c => `
-        <div class="item" onclick="document.getElementById('changeLookup').value='${escapeJs(c.commit_sha)}'">
-          <div><strong>${escapeHtml(c.commit_sha)}</strong> <span class="pill">${escapeHtml(c.risk_level)}</span> <span class="pill">${escapeHtml(c.review_status)}</span></div>
-          <div class="muted">asset_id: ${c.asset_id ?? '-'} | asset_version_id: ${c.asset_version_id ?? '-'}</div>
-          <div class="muted">impact_scope: ${(c.impact_scope || []).map(x => `<span class="pill">${escapeHtml(x)}</span>`).join(' ')}</div>
-        </div>
-      `).join('');
+      box.innerHTML = data.map(c => {
+        const riskClass = c.risk_level === 'high' ? 'fail' : c.risk_level === 'medium' ? 'warn' : '';
+        const reviewClass = c.review_status === 'approved' ? 'pass' : c.review_status === 'rejected' ? 'fail' : 'warn';
+        return `
+          <div class="list-item clickable" onclick="document.getElementById('changeLookup').value='${escapeJs(c.commit_sha)}'">
+            <div class="list-row">
+              <div class="list-title">${escapeHtml((c.commit_sha || '').substring(0,7))}<span class="id-tag" style="margin-left:6px;">...</span></div>
+              <div style="display:flex; gap:6px;">
+                <span class="pill ${riskClass}">${escapeHtml(c.risk_level)}</span>
+                <span class="pill ${reviewClass}">${escapeHtml(c.review_status)}</span>
+              </div>
+            </div>
+            <div class="meta-row">
+              <span>asset_id: <span class="v">${c.asset_id ?? '-'}</span></span>
+              <span>version_id: <span class="v">${c.asset_version_id ?? '-'}</span></span>
+            </div>
+            <div class="meta-row">
+              <span>${t('scopeLabel')}: ${(c.impact_scope || []).map(x => `<span class="tag">${escapeHtml(x)}</span>`).join('') || '-'}</span>
+            </div>
+          </div>
+        `;
+      }).join('');
     } catch (e) {
-      document.getElementById('changesList').innerHTML = `<div class="muted">Failed to load / 加载失败: ${escapeHtml(e.message)}</div>`;
+      document.getElementById('changesList').innerHTML = `<div class="error">${t('loadFailed')}: ${escapeHtml(e.message)}</div>`;
     }
   }
 
+  /* ========== LOGS ========== */
   async function createLog() {
     try {
       const payload = {
@@ -527,9 +1073,9 @@
       };
       await request('/api/logs/', { method: 'POST', body: JSON.stringify(payload) });
       await loadLogs();
-      toast('Log recorded successfully / 日志已写入');
+      toast(t('logRecorded'));
     } catch (e) {
-      alert('Failed to record log / 写入日志失败: ' + e.message);
+      alert(t('failLog') + ': ' + e.message);
     }
   }
 
@@ -543,41 +1089,62 @@
       const data = await request('/api/logs/' + (params.toString() ? ('?' + params.toString()) : ''));
       const box = document.getElementById('logsList');
       if (!data.length) {
-        box.innerHTML = '<div class="muted">No logs found / 暂无日志</div>';
+        box.innerHTML = `<div class="empty">${t('noLogs')}</div>`;
         return;
       }
       box.innerHTML = data.map(l => `
-        <div class="item">
-          <div><strong>#${l.id}</strong> asset_version_id: ${l.asset_version_id} <span class="pill">${escapeHtml(l.model_name || '')}</span></div>
-          <div class="muted">request_id: ${escapeHtml(l.request_id || '-')} | latency: ${l.latency_ms}ms | tokens: ${l.token_usage}</div>
-          <div class="json small muted">${escapeHtml(JSON.stringify(l.input_variables || {}, null, 2))}</div>
+        <div class="list-item">
+          <div class="list-row">
+            <div class="list-title">
+              <span class="id-tag">#${l.id}</span>
+              <span style="font-size:11px; color:var(--text-muted);">v_id: ${l.asset_version_id}</span>
+            </div>
+            <span class="pill dark">${escapeHtml(l.model_name || 'unknown')}</span>
+          </div>
+          <div class="meta-row">
+            <span>req_id: <span class="v">${escapeHtml(l.request_id || '-')}</span></span>
+            <span>lat: <span class="v">${l.latency_ms}ms</span></span>
+            <span>tkns: <span class="v">${l.token_usage}</span></span>
+          </div>
+          <pre class="code-block">${escapeHtml(JSON.stringify(l.input_variables || {}, null, 2))}</pre>
         </div>
       `).join('');
     } catch (e) {
-      document.getElementById('logsList').innerHTML = `<div class="muted">Failed to load / 加载失败: ${escapeHtml(e.message)}</div>`;
+      document.getElementById('logsList').innerHTML = `<div class="error">${t('loadFailed')}: ${escapeHtml(e.message)}</div>`;
     }
   }
 
+  /* ========== GATE ========== */
   async function checkGate() {
+    const resBox = document.getElementById('gateResult');
+    resBox.innerHTML = `<div class="pulse">${t('runningCheck')}</div>`;
     try {
       const payload = {
         commit_sha: document.getElementById('gateCommitSha').value.trim(),
         is_ai_related: document.getElementById('gateAiRelated').checked,
       };
       const data = await request('/api/ci/gate/check', { method: 'POST', body: JSON.stringify(payload) });
-      document.getElementById('gateResult').innerHTML = `
-        <div><strong>Status:</strong> <span class="status ${escapeHtml(data.status)}">${escapeHtml(data.status)}</span></div>
-        <div class="muted" style="margin-top:8px;">commit_sha: ${escapeHtml(data.commit_sha)}</div>
-        <div class="muted" style="margin-top:8px;">Reasons / 检查说明:</div>
-        <div class="json">${escapeHtml(JSON.stringify(data.reasons || [], null, 2))}</div>
-        <div class="muted" style="margin-top:8px;">Change Request / 关联变更:</div>
-        <div class="json">${escapeHtml(JSON.stringify(data.change_request || {}, null, 2))}</div>
+      const statusClass = data.status === 'pass' ? 'pass' : data.status === 'warn' ? 'warn' : 'fail';
+      resBox.innerHTML = `
+        <div class="gate-head">
+          <div><strong>${t('targetSha')}:</strong> <span style="color:var(--text); font-weight:700;">${escapeHtml(data.commit_sha || '-')}</span></div>
+          <span class="pill ${statusClass}" style="font-size:11px; padding:4px 12px;">${escapeHtml(data.status)}</span>
+        </div>
+        <div style="margin-bottom:14px;">
+          <div class="gate-section-label">${t('reasons')}</div>
+          <pre class="code-block" style="margin-top:0;">${escapeHtml(JSON.stringify(data.reasons || [], null, 2))}</pre>
+        </div>
+        <div>
+          <div class="gate-section-label">${t('linkedCR')}</div>
+          <pre class="code-block" style="margin-top:0;">${escapeHtml(JSON.stringify(data.change_request || {}, null, 2))}</pre>
+        </div>
       `;
     } catch (e) {
-      document.getElementById('gateResult').innerHTML = `<div class="muted">Check failed / 检查失败: ${escapeHtml(e.message)}</div>`;
+      resBox.innerHTML = `<div class="error">${t('checkFailed')}: ${escapeHtml(e.message)}</div>`;
     }
   }
 
+  /* ========== HELPERS ========== */
   function escapeHtml(str) {
     return String(str)
       .replace(/&/g, '&amp;')
@@ -591,10 +1158,14 @@
     return String(str).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
   }
 
-  loadAssets();
-  loadChanges();
-  loadLogs();
-  pingHealth();
+  /* ========== INIT ========== */
+  applyI18n();
+  setTimeout(() => {
+    loadAssets();
+    loadChanges();
+    loadLogs();
+    pingHealth();
+  }, 100);
 </script>
 </body>
 </html>
