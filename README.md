@@ -33,7 +33,7 @@ Click `写入 Demo` to create a governed finance Agent sample, then try:
 ## SDK
 
 ```bash
-pip3 install 'git+https://github.com/PeterShanxin/stunning-potato.git#subdirectory=echo_sdk_package'
+pip3 install 'git+https://github.com/xxx0438/stunning-potato.git#subdirectory=echo_sdk_package'
 ```
 
 ```python
