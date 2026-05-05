@@ -1,3 +1,4 @@
+[USER_GUIDE.md](https://github.com/user-attachments/files/27415769/USER_GUIDE.md)
 # Echo Prompt Manager — User Guide
 
 > **The ultimate CMS for LLM Prompts. Decouple your prompts from your codebase.**
