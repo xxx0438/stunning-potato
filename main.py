@@ -1,3 +1,4 @@
+from collections import Counter
 from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional
@@ -231,6 +232,15 @@ class GateCheckRequest(BaseModel):
     is_ai_related: bool = False
 
 
+class RuntimeGuardrailCheckRequest(BaseModel):
+    asset_version_id: Optional[int] = None
+    asset_name: Optional[str] = None
+    tool_name: str = ""
+    tool_args: Dict[str, Any] = Field(default_factory=dict)
+    input_variables: Dict[str, Any] = Field(default_factory=dict)
+    actor: str = ""
+
+
 # ==========================================
 # 5. App
 # ==========================================
@@ -301,6 +311,174 @@ def change_request_to_dict(cr: ChangeRequest) -> Dict[str, Any]:
         "created_at": cr.created_at,
         "updated_at": cr.updated_at,
     }
+
+
+def _enum_counter(items: List[Any]) -> Dict[str, int]:
+    return {str(k.value if hasattr(k, "value") else k): v for k, v in Counter(items).items()}
+
+
+def _field_value(payload: RuntimeGuardrailCheckRequest, field_path: str) -> Any:
+    roots = {
+        "tool_args": payload.tool_args,
+        "input_variables": payload.input_variables,
+    }
+    if "." not in field_path:
+        return roots.get(field_path)
+
+    root_name, path = field_path.split(".", 1)
+    current = roots.get(root_name)
+    for part in path.split("."):
+        if isinstance(current, dict):
+            current = current.get(part)
+        else:
+            return None
+    return current
+
+
+def _rule_matches_tool(rule: Dict[str, Any], tool_name: str) -> bool:
+    tools = rule.get("tools")
+    if tools is None and rule.get("tool") is not None:
+        tools = [rule.get("tool")]
+    if not tools:
+        return True
+    return tool_name in tools
+
+
+def _raise_decision(current: str, candidate: str) -> str:
+    rank = {"allow": 0, "review": 1, "block": 2}
+    return candidate if rank[candidate] > rank[current] else current
+
+
+def evaluate_runtime_guardrails(
+    version: AssetVersion,
+    payload: RuntimeGuardrailCheckRequest,
+) -> Dict[str, Any]:
+    guardrails = version.guardrails or []
+    decision = "allow"
+    findings = []
+
+    if not guardrails:
+        return {
+            "decision": "review",
+            "findings": [
+                {
+                    "rule": "guardrail_coverage",
+                    "decision": "review",
+                    "reason": "No runtime guardrails are configured for this active asset version.",
+                }
+            ],
+        }
+
+    for index, raw_rule in enumerate(guardrails, start=1):
+        if isinstance(raw_rule, str):
+            findings.append(
+                {
+                    "rule": f"manual_rule_{index}",
+                    "decision": "allow",
+                    "reason": raw_rule,
+                }
+            )
+            continue
+
+        if not isinstance(raw_rule, dict):
+            findings.append(
+                {
+                    "rule": f"rule_{index}",
+                    "decision": "review",
+                    "reason": "Guardrail rule is not structured JSON.",
+                }
+            )
+            decision = _raise_decision(decision, "review")
+            continue
+
+        rule_type = str(raw_rule.get("type", "")).lower()
+        rule_name = raw_rule.get("name") or rule_type or f"rule_{index}"
+        severity = str(raw_rule.get("severity", "")).lower()
+        fail_decision = "block" if severity == "high" else "review"
+
+        if rule_type in {"blocked_tool", "deny_tool"} and _rule_matches_tool(raw_rule, payload.tool_name):
+            decision = _raise_decision(decision, "block")
+            findings.append(
+                {
+                    "rule": rule_name,
+                    "decision": "block",
+                    "reason": raw_rule.get("reason") or f"Tool '{payload.tool_name}' is blocked.",
+                }
+            )
+            continue
+
+        if rule_type in {"requires_approval", "approval_required"} and _rule_matches_tool(raw_rule, payload.tool_name):
+            decision = _raise_decision(decision, "review")
+            findings.append(
+                {
+                    "rule": rule_name,
+                    "decision": "review",
+                    "reason": raw_rule.get("reason") or f"Tool '{payload.tool_name}' requires human approval.",
+                }
+            )
+            continue
+
+        if rule_type == "allowed_tools":
+            tools = raw_rule.get("tools") or []
+            if payload.tool_name not in tools:
+                decision = _raise_decision(decision, "block")
+                findings.append(
+                    {
+                        "rule": rule_name,
+                        "decision": "block",
+                        "reason": f"Tool '{payload.tool_name}' is outside the allowlist.",
+                    }
+                )
+            continue
+
+        if rule_type == "deny_keyword":
+            field = raw_rule.get("field", "input_variables.user_message")
+            value = str(_field_value(payload, field) or "").lower()
+            keywords = [str(k).lower() for k in raw_rule.get("keywords", [])]
+            matched = [k for k in keywords if k and k in value]
+            if matched:
+                decision = _raise_decision(decision, fail_decision)
+                findings.append(
+                    {
+                        "rule": rule_name,
+                        "decision": fail_decision,
+                        "reason": raw_rule.get("reason") or f"Denied keyword matched in {field}.",
+                        "matched": matched,
+                    }
+                )
+            continue
+
+        if rule_type == "max_amount":
+            field = raw_rule.get("field", "tool_args.amount")
+            limit = raw_rule.get("limit")
+            value = _field_value(payload, field)
+            try:
+                over_limit = limit is not None and float(value) > float(limit)
+            except (TypeError, ValueError):
+                over_limit = False
+            if over_limit:
+                decision = _raise_decision(decision, fail_decision)
+                findings.append(
+                    {
+                        "rule": rule_name,
+                        "decision": fail_decision,
+                        "reason": raw_rule.get("reason") or f"{field} exceeds limit {limit}.",
+                    }
+                )
+            continue
+
+        findings.append(
+            {
+                "rule": rule_name,
+                "decision": "allow",
+                "reason": raw_rule.get("reason") or "Rule registered for audit evidence.",
+            }
+        )
+
+    if not findings:
+        findings.append({"rule": "runtime_check", "decision": "allow", "reason": "No rule was triggered."})
+
+    return {"decision": decision, "findings": findings}
 
 
 # ==========================================
@@ -665,11 +843,212 @@ def ci_gate_check(payload: GateCheckRequest, db: Session = Depends(get_db)):
 
 
 # ==========================================
-# 11. Health check
+# 11. Runtime guardrails / audit evidence
+# ==========================================
+@app.post("/api/runtime/guardrails/check", tags=["运行时治理"])
+def runtime_guardrail_check(payload: RuntimeGuardrailCheckRequest, db: Session = Depends(get_db)):
+    version = None
+    asset = None
+
+    if payload.asset_version_id is not None:
+        version = db.query(AssetVersion).filter(AssetVersion.id == payload.asset_version_id).first()
+        if not version:
+            raise HTTPException(status_code=404, detail="Asset version not found")
+        asset = db.query(Asset).filter(Asset.id == version.asset_id).first()
+    elif payload.asset_name:
+        asset = db.query(Asset).filter(Asset.name == payload.asset_name).first()
+        if not asset:
+            raise HTTPException(status_code=404, detail="Asset not found")
+        version = (
+            db.query(AssetVersion)
+            .filter(AssetVersion.asset_id == asset.id, AssetVersion.status == VersionStatus.active)
+            .first()
+        )
+        if not version:
+            raise HTTPException(status_code=404, detail="No active version found for this asset")
+    else:
+        raise HTTPException(status_code=400, detail="asset_version_id or asset_name is required")
+
+    result = evaluate_runtime_guardrails(version, payload)
+    return {
+        "status": result["decision"],
+        "asset": asset_to_dict(asset) if asset else None,
+        "version": {
+            "id": version.id,
+            "version_tag": version.version_tag,
+            "status": version.status,
+        },
+        "tool_name": payload.tool_name,
+        "actor": payload.actor,
+        "findings": result["findings"],
+        "checked_at": datetime.utcnow(),
+    }
+
+
+@app.get("/api/audit/reports/summary", tags=["审计报告"])
+def audit_summary(db: Session = Depends(get_db)):
+    assets = db.query(Asset).all()
+    versions = db.query(AssetVersion).all()
+    changes = db.query(ChangeRequest).all()
+    logs = db.query(ExecutionLog).all()
+
+    active_versions = [v for v in versions if v.status == VersionStatus.active]
+    versions_with_guardrails = [v for v in versions if v.guardrails]
+    high_risk_changes = [c for c in changes if c.risk_level == RiskLevel.high]
+    blocked_changes = [
+        c for c in changes
+        if c.risk_level == RiskLevel.high and (not c.review_required or c.review_status != ReviewStatus.approved)
+    ]
+
+    return {
+        "generated_at": datetime.utcnow(),
+        "asset_count": len(assets),
+        "version_count": len(versions),
+        "active_version_count": len(active_versions),
+        "guardrail_coverage_count": len(versions_with_guardrails),
+        "guardrail_coverage_ratio": round(len(versions_with_guardrails) / len(versions), 3) if versions else 0,
+        "change_count": len(changes),
+        "high_risk_change_count": len(high_risk_changes),
+        "ci_block_candidate_count": len(blocked_changes),
+        "execution_log_count": len(logs),
+        "assets_by_type": _enum_counter([a.asset_type for a in assets]),
+        "versions_by_status": _enum_counter([v.status for v in versions]),
+        "changes_by_risk": _enum_counter([c.risk_level for c in changes]),
+        "changes_by_review_status": _enum_counter([c.review_status for c in changes]),
+        "evidence": {
+            "asset_registry": len(assets) > 0,
+            "version_history": len(versions) > 0,
+            "change_management": len(changes) > 0,
+            "ci_gate": len(changes) > 0,
+            "runtime_guardrails": len(versions_with_guardrails) > 0,
+            "execution_logs": len(logs) > 0,
+        },
+    }
+
+
+@app.post("/api/demo/seed", tags=["演示数据"])
+def seed_demo_data(db: Session = Depends(get_db)):
+    asset = db.query(Asset).filter(Asset.name == "loan_agent_governance").first()
+    if not asset:
+        asset = Asset(
+            name="loan_agent_governance",
+            asset_type=AssetType.workflow,
+            description="Production loan assistant agent with governed context, workflow, and runtime tool policies.",
+            owner="ai-platform",
+            tags=["agent", "finance", "eu-ai-act", "runtime-guardrails"],
+        )
+        db.add(asset)
+        db.commit()
+        db.refresh(asset)
+
+    version = (
+        db.query(AssetVersion)
+        .filter(AssetVersion.asset_id == asset.id, AssetVersion.version_tag == "v1.0-governed")
+        .first()
+    )
+    if not version:
+        db.query(AssetVersion).filter(AssetVersion.asset_id == asset.id).update(
+            {AssetVersion.status: VersionStatus.approved}
+        )
+        version = AssetVersion(
+            asset_id=asset.id,
+            version_tag="v1.0-governed",
+            status=VersionStatus.active,
+            system_prompt=(
+                "You are a loan assistant agent. Explain decisions, cite policy context, "
+                "and never execute financial tools without the configured runtime guardrails."
+            ),
+            context_template="customer_profile={{customer_profile}}\nloan_policy={{loan_policy}}\nregion={{region}}",
+            workflow_spec={
+                "steps": ["collect_context", "assess_risk", "draft_answer", "request_human_approval_for_tools"],
+                "owner": "ai-platform",
+            },
+            examples=[
+                {"input": "Can I increase my credit line?", "output": "I can explain eligibility and route approval."}
+            ],
+            guardrails=[
+                {
+                    "type": "allowed_tools",
+                    "name": "finance_tool_allowlist",
+                    "tools": ["lookup_policy", "create_case", "request_human_approval"],
+                    "severity": "high",
+                    "reason": "Only reviewed tools are allowed in regulated finance flows.",
+                },
+                {
+                    "type": "max_amount",
+                    "name": "approval_amount_limit",
+                    "field": "tool_args.amount",
+                    "limit": 5000,
+                    "severity": "high",
+                    "reason": "Amounts above 5000 require a separate approval workflow.",
+                },
+                {
+                    "type": "deny_keyword",
+                    "name": "sensitive_intent_filter",
+                    "field": "input_variables.user_message",
+                    "keywords": ["bypass", "ignore policy", "fake income"],
+                    "severity": "medium",
+                    "reason": "Suspicious intent requires review before the agent continues.",
+                },
+            ],
+            variables_schema={
+                "customer_profile": {"type": "object"},
+                "loan_policy": {"type": "string"},
+                "region": {"type": "string"},
+            },
+            change_summary="Initial governed agent workflow with CI and runtime policies.",
+            created_by="demo-seed",
+        )
+        db.add(version)
+        db.commit()
+        db.refresh(version)
+
+    change = db.query(ChangeRequest).filter(ChangeRequest.commit_sha == "demo-high-risk-001").first()
+    if not change:
+        change = ChangeRequest(
+            commit_sha="demo-high-risk-001",
+            pr_id="PR-128",
+            asset_id=asset.id,
+            asset_version_id=version.id,
+            risk_level=RiskLevel.high,
+            impact_scope=["loan_decisioning", "runtime_tools", "regulated_finance"],
+            review_required=True,
+            review_status=ReviewStatus.pending,
+            notes="Demo high-risk prompt/workflow change awaiting human approval.",
+            created_by="demo-seed",
+        )
+        db.add(change)
+
+    existing_log = db.query(ExecutionLog).filter(ExecutionLog.request_id == "demo-run-001").first()
+    if not existing_log:
+        db.add(
+            ExecutionLog(
+                asset_version_id=version.id,
+                request_id="demo-run-001",
+                model_name="gpt-4o",
+                input_variables={"user_message": "Can I increase my credit line?", "region": "EU"},
+                llm_output="I can explain eligibility and create a review case for a human approver.",
+                latency_ms=842,
+                token_usage=318,
+                created_by="demo-seed",
+            )
+        )
+
+    db.commit()
+    return {
+        "status": "seeded",
+        "asset": asset_to_dict(asset),
+        "version": version_to_dict(version),
+        "change": change_request_to_dict(change),
+    }
+
+
+# ==========================================
+# 12. Health check
 # ==========================================
 @app.get("/health")
 def health():
-    return {"status": "ok", "service": "echo_prompt_manager"}
+    return {"status": "ok", "service": "echo_agent_governance"}
 
 
 
