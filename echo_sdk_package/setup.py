@@ -1,13 +1,13 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="echo-prompt",             # 🌟 投资人会看到的包名
+    name="echo-agent-governance",
     version="0.1.0",
-    description="Official Python SDK for Echo Prompt CMS",
-    author="Your Awesome Startup",
-    packages=find_packages(),       # 自动发现 echo_sdk 文件夹
+    description="Official Python SDK for Echo Agent Governance",
+    author="Echo",
+    packages=find_packages(),
     install_requires=[
-        "requests>=2.25.0",         # 自动帮你安装依赖的网络请求库
+        "requests>=2.25.0",
     ],
     python_requires=">=3.7",
 )
