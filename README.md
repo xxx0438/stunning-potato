@@ -674,4 +674,4 @@ Style: `ruff` + `black`, type-checked with `mypy`, `pytest` runs on every commit
 
 ## 📄 License
 
-MIT © Echo Agent Governance contributors
+Business Source License 1.1
