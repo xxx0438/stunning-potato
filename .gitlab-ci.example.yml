@@ -1,0 +1,141 @@
+# ============================================================
+# Echo Agent Governance - GitLab CI integration example
+# ============================================================
+# Purpose:
+#   - On every MR that touches AI assets, run Echo CI Gate
+#   - Optionally: import the MR into Echo, write the gate result
+#     back as a GitLab commit status
+#
+# Required CI/CD variables (Settings → CI/CD → Variables):
+#   ECHO_BASE_URL          e.g. https://echo.your-company.com
+#   ECHO_ACTOR             e.g. gitlab-ci (service account name)
+#   ECHO_ROLES             e.g. contributor,reviewer
+#   ECHO_API_TOKEN         optional, reserved for future auth
+#
+# Branch / MR variables used (auto-populated by GitLab):
+#   CI_PROJECT_ID, CI_COMMIT_SHA, CI_MERGE_REQUEST_IID,
+#   CI_PIPELINE_ID, CI_PROJECT_URL, CI_PIPELINE_URL
+# ============================================================
+
+stages:
+  - import
+  - review
+  - writeback
+
+variables:
+  ECHO_TIMEOUT: "20"
+
+# ------------------------------------------------------------
+# Stage 1: Import the MR into Echo so it has full context
+# ------------------------------------------------------------
+echo:import-mr:
+  stage: import
+  image: curlimages/curl:8.5.0
+  rules:
+    - if: $CI_MERGE_REQUEST_IID
+  script:
+    - |
+      echo "▶️  Importing MR !$CI_MERGE_REQUEST_IID into Echo..."
+      curl -fsS --max-time "$ECHO_TIMEOUT" \
+        -X POST "$ECHO_BASE_URL/api/integrations/gitlab/import-mr" \
+        -H "Content-Type: application/json" \
+        -H "X-Echo-Actor: ${ECHO_ACTOR:-gitlab-ci}" \
+        -H "X-Echo-Roles: ${ECHO_ROLES:-contributor}" \
+        -d "{
+          \"project_id\": \"$CI_PROJECT_ID\",
+          \"merge_request_iid\": \"$CI_MERGE_REQUEST_IID\",
+          \"created_by\": \"gitlab-ci\"
+        }" \
+        | tee echo_import.json
+  artifacts:
+    paths:
+      - echo_import.json
+    expire_in: 1 week
+
+# ------------------------------------------------------------
+# Stage 2: Run the gate. Block the pipeline if Echo says block.
+# ------------------------------------------------------------
+echo:ci-gate:
+  stage: review
+  image: curlimages/curl:8.5.0
+  needs: ["echo:import-mr"]
+  rules:
+    - if: $CI_MERGE_REQUEST_IID
+  script:
+    - |
+      echo "▶️  Running Echo CI Gate for commit $CI_COMMIT_SHA..."
+      RESPONSE=$(curl -fsS --max-time "$ECHO_TIMEOUT" \
+        -X POST "$ECHO_BASE_URL/api/ci/gate/check" \
+        -H "Content-Type: application/json" \
+        -H "X-Echo-Actor: ${ECHO_ACTOR:-gitlab-ci}" \
+        -H "X-Echo-Roles: ${ECHO_ROLES:-contributor}" \
+        -d "{
+          \"commit_sha\": \"$CI_COMMIT_SHA\",
+          \"is_ai_related\": true,
+          \"provider\": \"gitlab\",
+          \"project_id\": \"$CI_PROJECT_ID\",
+          \"mr_iid\": \"$CI_MERGE_REQUEST_IID\",
+          \"pipeline_id\": \"$CI_PIPELINE_ID\"
+        }")
+      echo "$RESPONSE" | tee echo_gate.json
+
+      STATUS=$(echo "$RESPONSE" | grep -oE '"status":"[^"]+"' | head -1 | cut -d'"' -f4)
+      echo "▶️  Echo gate decision: $STATUS"
+
+      case "$STATUS" in
+        pass)
+          echo "✅ Echo gate PASSED."
+          ;;
+        warn)
+          echo "⚠️  Echo gate WARN — proceeding but please review."
+          ;;
+        block)
+          echo "❌ Echo gate BLOCKED."
+          echo "Reasons:"
+          echo "$RESPONSE" | grep -oE '"reasons":\[[^]]*\]' || true
+          exit 1
+          ;;
+        *)
+          echo "❌ Echo gate returned unknown status: $STATUS"
+          echo "Raw response: $RESPONSE"
+          exit 1
+          ;;
+      esac
+  artifacts:
+    paths:
+      - echo_gate.json
+    expire_in: 1 week
+    when: always
+
+# ------------------------------------------------------------
+# Stage 3: Write the gate result back as a GitLab commit status
+# ------------------------------------------------------------
+echo:status-writeback:
+  stage: writeback
+  image: curlimages/curl:8.5.0
+  needs: ["echo:ci-gate"]
+  rules:
+    - if: $CI_MERGE_REQUEST_IID
+      when: always
+  script:
+    - |
+      if [ ! -f echo_gate.json ]; then
+        echo "echo_gate.json missing, skipping writeback."
+        exit 0
+      fi
+      STATUS=$(grep -oE '"status":"[^"]+"' echo_gate.json | head -1 | cut -d'"' -f4)
+      echo "▶️  Writing back status=$STATUS to GitLab..."
+      curl -fsS --max-time "$ECHO_TIMEOUT" \
+        -X POST "$ECHO_BASE_URL/api/integrations/gitlab/status" \
+        -H "Content-Type: application/json" \
+        -H "X-Echo-Actor: ${ECHO_ACTOR:-gitlab-ci}" \
+        -H "X-Echo-Roles: ${ECHO_ROLES:-contributor}" \
+        -d "{
+          \"project_id\": \"$CI_PROJECT_ID\",
+          \"commit_sha\": \"$CI_COMMIT_SHA\",
+          \"status\": \"$STATUS\",
+          \"name\": \"echo/agent-governance\",
+          \"target_url\": \"$CI_PIPELINE_URL\",
+          \"description\": \"Echo gate: $STATUS\",
+          \"dry_run\": false
+        }"
