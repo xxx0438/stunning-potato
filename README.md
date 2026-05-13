@@ -675,3 +675,81 @@ Style: `ruff` + `black`, type-checked with `mypy`, `pytest` runs on every commit
 ## 📄 License
 
 Business Source License 1.1
+
+License text copyright (c) 2024 MariaDB plc, All Rights Reserved.
+"Business Source License" is a trademark of MariaDB plc.
+
+-----------------------------------------------------------------------------
+
+Parameters
+
+Licensor:             Yizhi Liu
+Licensed Work:        Echo Agent Governance
+                      The Licensed Work is (c) 2026 ▶️ Yizhi Liu
+Additional Use Grant: You may make production use of the Licensed Work,
+                      provided that your use does not include offering
+                      the Licensed Work to third parties on a hosted or
+                      embedded basis in order to compete with the
+                      Licensor's paid version(s) of the Licensed Work.
+                      For purposes of this license:
+
+                      A "competing offering" is a product that is offered
+                      to third parties on a paid basis, including through
+                      paid support arrangements, that significantly
+                      overlaps with the capabilities of the Licensor's
+                      paid version(s) of the Licensed Work. If your
+                      product is not a competing offering, the Additional
+                      Use Grant applies to you.
+
+                      "Hosted or embedded" means offering the Licensed
+                      Work, or any portion of its functionality, as a
+                      hosted service (SaaS, PaaS, or similar) or as an
+                      embedded component of a third-party product or
+                      service.
+
+Change Date:          2030-05-13 
+
+Change License:       Apache License, Version 2.0
+
+-----------------------------------------------------------------------------
+
+Terms
+
+The Licensor hereby grants you the right to copy, modify, create derivative
+works, redistribute, and make non-production use of the Licensed Work. The
+Licensor may make an Additional Use Grant, above, permitting limited
+production use.
+
+Effective on the Change Date, or the fourth anniversary of the first
+publicly available distribution of a specific version of the Licensed Work
+under this License, whichever comes first, the Licensor hereby grants you
+rights under the terms of the Change License, and the rights granted in the
+paragraph above terminate.
+
+If your use of the Licensed Work does not comply with the requirements
+currently in effect as described in this License, you must purchase a
+commercial license from the Licensor, its affiliated entities, or authorized
+resellers, or you must refrain from using the Licensed Work.
+
+All copies of the original and modified Licensed Work, and derivative works
+of the Licensed Work, are subject to this License. This License applies
+separately for each version of the Licensed Work and the Change Date may
+vary for each version of the Licensed Work released by Licensor.
+
+You must conspicuously display this License on each original or modified
+copy of the Licensed Work. If you receive the Licensed Work in original or
+modified form from a third party, the terms and conditions set forth in
+this License apply to your use of that work.
+
+Any use of the Licensed Work in violation of this License will automatically
+terminate your rights under this License for the current and all other
+versions of the Licensed Work.
+
+This License does not grant you any right in any trademark or logo of
+Licensor or its affiliates (provided that you may use a trademark or logo of
+Licensor as expressly required by this License).
+
+TO THE EXTENT PERMITTED BY APPLICABLE LAW, THE LICENSED WORK IS PROVIDED ON
+AN "AS IS" BASIS. LICENSOR HEREBY DISCLAIMS ALL WARRANTIES AND CONDITIONS,
+EXPRESS OR IMPLIED, INCLUDING (WITHOUT LIMITATION) WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, NON-INFRINGE
