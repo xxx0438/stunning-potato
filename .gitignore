@@ -1,21 +1,30 @@
-# 数据库文件 (不要把本地测试数据传上去)
-*.db
-*.sqlite3
-
-# Python 缓存
+# Python
 __pycache__/
 *.pyc
-.pytest_cache/
-
-# 虚拟环境
-venv/
-env/
+*.pyo
+*.egg-info/
 .venv/
+venv/
 
-# Mac 系统文件
-.DS_Store
+# Tests
+.pytest_cache/
+.coverage
+htmlcov/
 
-# SDK 打包缓存
-echo_sdk_package/build/
-echo_sdk_package/dist/
-echo_sdk_package/*.egg-info/
+# Lint
+.ruff_cache/
+.mypy_cache/
+
+# DB
+*.db
+*.sqlite
+echo_prompt_manager.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Env
+.env
+.env.local
