@@ -34,6 +34,13 @@ def setup_metrics() -> None:
     global gate_decisions_total, guardrail_decisions_total
     global evaluation_runs_total, evaluation_score_histogram
     global ratelimit_rejections_total, tenant_active_assets
+    global webhook_deliveries_total
+webhook_deliveries_total = Counter(
+    "echo_webhook_deliveries_total",
+    "Outbound webhook delivery attempts",
+    ["status", "event_type", "tenant"],
+    registry=_registry,
+)
 
     if os.getenv("ECHO_METRICS_ENABLED", "1").lower() not in ("1", "true", "yes"):
         return
@@ -133,6 +140,15 @@ def inc_request(method: str, path: str, status: int, tenant: str = "-"):
     if _enabled and http_requests_total is not None:
         try:
             http_requests_total.labels(method=method, path=path, status=str(status), tenant=tenant).inc()
+        except Exception:
+            pass
+
+def inc_webhook(status: str, event_type: str, tenant: str = "-"):
+    if _enabled and webhook_deliveries_total is not None:
+        try:
+            webhook_deliveries_total.labels(
+                status=status, event_type=event_type, tenant=tenant
+            ).inc()
         except Exception:
             pass
 
