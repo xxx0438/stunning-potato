@@ -186,7 +186,8 @@ def _deliver_one(sub, delivery) -> None:
         delay = min(60 * (2 ** (delivery.attempts - 1)), 3600)
         delivery.status = "failed"
         delivery.next_attempt_at = _utcnow() + timedelta(seconds=delay)
-
+from app import metrics as _metrics
+_metrics.inc_webhook(delivery.status, delivery.event_type, delivery.tenant_id)
 def flush_due(db: Session, limit: int = 25) -> int:
     """Pick up due pending/failed deliveries and try to send them.
 
