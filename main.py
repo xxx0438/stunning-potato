@@ -2957,6 +2957,184 @@ def seed_demo(db: Session = Depends(get_db),
 # =====================================================
 # 15. Health / Metrics / Root
 # =====================================================
+# =====================================================
+# Webhooks
+# =====================================================
+@app.post("/api/webhooks/subscriptions/", tags=["Webhooks"])
+def create_subscription(
+    payload: WebhookSubscriptionCreate,
+    db: Session = Depends(get_db),
+    _=Depends(ratelimit.check_rate_limit),
+    context: Dict[str, Any] = Depends(require_role(["admin", "maintainer", "owner"])),
+):
+    if not payload.target_url.startswith(("https://", "http://")):
+        raise HTTPException(status_code=400, detail="target_url must be http(s)://")
+    sub = WebhookSubscription(
+        name=payload.name, target_url=payload.target_url, secret=payload.secret,
+        event_filters=payload.event_filters or ["*"],
+        enabled=payload.enabled, max_attempts=payload.max_attempts,
+        created_by=context["actor"],
+    )
+    db.add(sub)
+    _activity(db, "webhook.subscription_created", "webhook_subscription",
+              payload.name, context["actor"], f"Subscription {payload.name} created",
+              {"target_url": payload.target_url, "filters": payload.event_filters})
+    db.commit()
+    db.refresh(sub)
+    return webhook_subscription_to_dict(sub)
+
+@app.get("/api/webhooks/subscriptions/", tags=["Webhooks"])
+def list_subscriptions(
+    db: Session = Depends(get_db),
+    _=Depends(ratelimit.check_rate_limit),
+    __=Depends(authenticate),
+    limit: int = Query(default=50, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+):
+    q = (filter_by_tenant(db.query(WebhookSubscription), WebhookSubscription)
+         .order_by(WebhookSubscription.id.desc()))
+    items, total = _apply_pagination(q, limit, offset)
+    return _paginated([webhook_subscription_to_dict(s) for s in items],
+                      total, limit, offset)
+
+@app.patch("/api/webhooks/subscriptions/{sub_id}", tags=["Webhooks"])
+def update_subscription(
+    sub_id: int,
+    payload: WebhookSubscriptionUpdate,
+    db: Session = Depends(get_db),
+    _=Depends(ratelimit.check_rate_limit),
+    context: Dict[str, Any] = Depends(require_role(["admin", "maintainer", "owner"])),
+):
+    sub = (filter_by_tenant(db.query(WebhookSubscription), WebhookSubscription)
+           .filter(WebhookSubscription.id == sub_id).first())
+    if not sub:
+        raise HTTPException(status_code=404, detail="Subscription not found")
+    if payload.name is not None:
+        sub.name = payload.name
+    if payload.target_url is not None:
+        if not payload.target_url.startswith(("https://", "http://")):
+            raise HTTPException(status_code=400, detail="target_url must be http(s)://")
+        sub.target_url = payload.target_url
+    if payload.secret is not None:
+        sub.secret = payload.secret
+    if payload.event_filters is not None:
+        sub.event_filters = payload.event_filters
+    if payload.enabled is not None:
+        sub.enabled = payload.enabled
+    if payload.max_attempts is not None:
+        sub.max_attempts = payload.max_attempts
+    _activity(db, "webhook.subscription_updated", "webhook_subscription", sub.id,
+              context["actor"], f"Subscription {sub.name} updated")
+    db.commit()
+    db.refresh(sub)
+    return webhook_subscription_to_dict(sub)
+
+@app.delete("/api/webhooks/subscriptions/{sub_id}", tags=["Webhooks"])
+def delete_subscription(
+    sub_id: int,
+    db: Session = Depends(get_db),
+    _=Depends(ratelimit.check_rate_limit),
+    context: Dict[str, Any] = Depends(require_role(["admin", "maintainer", "owner"])),
+):
+    sub = (filter_by_tenant(db.query(WebhookSubscription), WebhookSubscription)
+           .filter(WebhookSubscription.id == sub_id).first())
+    if not sub:
+        raise HTTPException(status_code=404, detail="Subscription not found")
+    name = sub.name
+    db.delete(sub)
+    _activity(db, "webhook.subscription_deleted", "webhook_subscription", sub_id,
+              context["actor"], f"Subscription {name} deleted")
+    db.commit()
+    return {"status": "deleted", "id": sub_id}
+
+@app.post("/api/webhooks/subscriptions/{sub_id}/test", tags=["Webhooks"])
+def test_subscription(
+    sub_id: int,
+    payload: WebhookTestRequest,
+    db: Session = Depends(get_db),
+    _=Depends(ratelimit.check_rate_limit),
+    context: Dict[str, Any] = Depends(authenticate),
+):
+    sub = (filter_by_tenant(db.query(WebhookSubscription), WebhookSubscription)
+           .filter(WebhookSubscription.id == sub_id).first())
+    if not sub:
+        raise HTTPException(status_code=404, detail="Subscription not found")
+    delivery = WebhookDelivery(
+        subscription_id=sub.id, event_type=payload.event_type,
+        entity_type="test", entity_id="",
+        payload=payload.sample_payload, status="pending",
+        delivery_uuid=str(uuid.uuid4()),
+        next_attempt_at=utcnow(),
+    )
+    db.add(delivery)
+    db.flush()
+    webhooks._deliver_one(sub, delivery)  # immediate attempt
+    _activity(db, "webhook.tested", "webhook_subscription", sub.id, context["actor"],
+              f"Test event {payload.event_type} sent",
+              {"status": delivery.status, "response_code": delivery.response_code})
+    db.commit()
+    db.refresh(delivery)
+    return webhook_delivery_to_dict(delivery)
+
+@app.get("/api/webhooks/deliveries/", tags=["Webhooks"])
+def list_deliveries(
+    db: Session = Depends(get_db),
+    _=Depends(ratelimit.check_rate_limit),
+    __=Depends(authenticate),
+    subscription_id: Optional[int] = None,
+    status: Optional[str] = None,
+    event_type: Optional[str] = None,
+    limit: int = Query(default=50, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+):
+    q = filter_by_tenant(db.query(WebhookDelivery), WebhookDelivery)
+    if subscription_id is not None:
+        q = q.filter(WebhookDelivery.subscription_id == subscription_id)
+    if status:
+        q = q.filter(WebhookDelivery.status == status)
+    if event_type:
+        q = q.filter(WebhookDelivery.event_type == event_type)
+    q = q.order_by(WebhookDelivery.id.desc())
+    items, total = _apply_pagination(q, limit, offset)
+    return _paginated([webhook_delivery_to_dict(d) for d in items],
+                      total, limit, offset)
+
+@app.post("/api/webhooks/deliveries/{delivery_id}/redeliver", tags=["Webhooks"])
+def redeliver(
+    delivery_id: int,
+    db: Session = Depends(get_db),
+    _=Depends(ratelimit.check_rate_limit),
+    context: Dict[str, Any] = Depends(require_role(["admin", "maintainer", "owner"])),
+):
+    d = (filter_by_tenant(db.query(WebhookDelivery), WebhookDelivery)
+         .filter(WebhookDelivery.id == delivery_id).first())
+    if not d:
+        raise HTTPException(status_code=404, detail="Delivery not found")
+    sub = (filter_by_tenant(db.query(WebhookSubscription), WebhookSubscription)
+           .filter(WebhookSubscription.id == d.subscription_id).first())
+    if not sub:
+        raise HTTPException(status_code=404, detail="Subscription not found")
+    d.status = "pending"
+    d.next_attempt_at = utcnow()
+    d.last_error = ""
+    webhooks._deliver_one(sub, d)
+    _activity(db, "webhook.redelivered", "webhook_delivery", d.id, context["actor"],
+              f"Manual redeliver {d.delivery_uuid}",
+              {"status": d.status, "response_code": d.response_code})
+    db.commit()
+    db.refresh(d)
+    return webhook_delivery_to_dict(d)
+
+@app.post("/api/webhooks/flush", tags=["Webhooks"])
+def manual_flush(
+    db: Session = Depends(get_db),
+    _=Depends(ratelimit.check_rate_limit),
+    __=Depends(require_role(["admin", "maintainer"])),
+    limit: int = Query(default=25, ge=1, le=200),
+):
+    processed = webhooks.flush_due(db, limit=limit)
+    return {"status": "ok", "processed": processed}
+
 @app.get("/health")
 def health():
     return {"status": "ok", "service": "echo_agent_governance", "version": app.version,
