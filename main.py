@@ -565,6 +565,43 @@ class EvaluationRun(Base):
     created_at = Column(DateTime, default=utcnow, nullable=False)
     finished_at = Column(DateTime, nullable=True)
 
+@mark_tenant_aware
+class WebhookSubscription(Base):
+    """Outbound webhook subscription, per tenant."""
+    __tablename__ = "webhook_subscriptions"
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = _tenant_col()
+    name = Column(String, nullable=False)
+    target_url = Column(String, nullable=False)
+    secret = Column(String, default="")            # for HMAC signing (optional)
+    event_filters = Column(JSON, default=list)     # ["*"] or ["change.*", "gate.blocked"]
+    enabled = Column(Boolean, default=True, nullable=False)
+    max_attempts = Column(Integer, default=6, nullable=False)
+    created_by = Column(String, default="")
+    created_at = Column(DateTime, default=utcnow, nullable=False)
+    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow, nullable=False)
+
+@mark_tenant_aware
+class WebhookDelivery(Base):
+    """Per-attempt delivery record."""
+    __tablename__ = "webhook_deliveries"
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = _tenant_col()
+    subscription_id = Column(Integer, ForeignKey("webhook_subscriptions.id"),
+                              nullable=False, index=True)
+    delivery_uuid = Column(String, unique=True, index=True, nullable=False)
+    event_type = Column(String, nullable=False, index=True)
+    entity_type = Column(String, default="")
+    entity_id = Column(String, default="")
+    payload = Column(JSON, default=dict)
+    status = Column(String, default="pending", index=True)  # pending|delivered|failed|dead
+    attempts = Column(Integer, default=0, nullable=False)
+    response_code = Column(Integer, nullable=True)
+    response_body = Column(Text, default="")
+    last_error = Column(Text, default="")
+    next_attempt_at = Column(DateTime, nullable=True, index=True)
+    created_at = Column(DateTime, default=utcnow, nullable=False)
+    delivered_at = Column(DateTime, nullable=True)
 # ============== Auto create (dev) ==============
 if os.getenv("ECHO_AUTO_CREATE_TABLES", "1").lower() in ("1", "true", "yes"):
     Base.metadata.create_all(bind=engine)
@@ -783,6 +820,25 @@ class DemoTokenRequest(BaseModel):
     roles: List[str] = Field(default_factory=lambda: ["viewer"])
     ttl_seconds: int = Field(default=3600, ge=60, le=86400)
 
+class WebhookSubscriptionCreate(BaseModel):
+    name: str
+    target_url: str
+    secret: str = ""
+    event_filters: List[str] = Field(default_factory=lambda: ["*"])
+    enabled: bool = True
+    max_attempts: int = Field(default=6, ge=1, le=20)
+
+class WebhookSubscriptionUpdate(BaseModel):
+    name: Optional[str] = None
+    target_url: Optional[str] = None
+    secret: Optional[str] = None
+    event_filters: Optional[List[str]] = None
+    enabled: Optional[bool] = None
+    max_attempts: Optional[int] = Field(default=None, ge=1, le=20)
+
+class WebhookTestRequest(BaseModel):
+    event_type: str = "echo.test"
+    sample_payload: Dict[str, Any] = Field(default_factory=lambda: {"hello": "world"})
 # =====================================================
 # 5. App + lifespan
 # =====================================================
