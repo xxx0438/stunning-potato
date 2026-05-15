@@ -11,6 +11,7 @@ v2.4 SaaS edition:
 """
 
 from __future__ import annotations
+from app import hashchain, metrics, ratelimit, telemetry, webhooks
 
 import asyncio
 import difflib as _difflib
