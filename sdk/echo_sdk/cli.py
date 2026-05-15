@@ -245,3 +245,111 @@ def build_parser() -> argparse.ArgumentParser:
     sp = sub.add_parser("guardrail", help="Runtime guardrail operations")
     rsub = sp.add_subparsers(dest="guardrail_command", required=True)
     rc = rsub.add_parser("check", help="Check a tool inv
+    # guardrail (续)
+    rc = rsub.add_parser("check", help="Check a tool invocation against runtime guardrails")
+    rc.add_argument("--asset", help="Asset name (will use active version)")
+    rc.add_argument("--version-id", type=int, help="Explicit asset_version_id")
+    rc.add_argument("--tool", required=True, help="Tool name being invoked")
+    rc.add_argument("--args", help="Tool args as JSON, e.g. '{\"amount\":1500}'")
+    rc.add_argument("--input", help="Input variables as JSON")
+    rc.add_argument("--who", help="Actor name (logged for audit)")
+    _add_global_args(rc)
+    rc.set_defaults(func=cmd_guardrail_check)
+
+    # asset
+    sp = sub.add_parser("asset", help="Asset operations")
+    asub = sp.add_subparsers(dest="asset_command", required=True)
+
+    al = asub.add_parser("list", help="List assets")
+    al.add_argument("--query", help="Search query")
+    al.add_argument("--type", help="Filter by asset_type")
+    al.add_argument("--owner")
+    al.add_argument("--namespace")
+    al.add_argument("--tag")
+    al.add_argument("--limit", type=int, default=50)
+    al.add_argument("--offset", type=int, default=0)
+    _add_global_args(al)
+    al.set_defaults(func=cmd_asset_list)
+
+    ag = asub.add_parser("get", help="Get one asset by id")
+    ag.add_argument("id", type=int)
+    _add_global_args(ag)
+    ag.set_defaults(func=cmd_asset_get)
+
+    # change
+    sp = sub.add_parser("change", help="Change request operations")
+    csub = sp.add_subparsers(dest="change_command", required=True)
+    cc = csub.add_parser("create", help="Register a change request")
+    cc.add_argument("--commit", required=True)
+    cc.add_argument("--asset-id", type=int)
+    cc.add_argument("--version-id", type=int)
+    cc.add_argument("--pr-id")
+    cc.add_argument("--risk", default="low",
+                     choices=("low", "medium", "high"))
+    cc.add_argument("--review-required", action="store_true")
+    cc.add_argument("--impact", help="Comma-separated impact scope")
+    cc.add_argument("--notes")
+    cc.add_argument("--created-by")
+    _add_global_args(cc)
+    cc.set_defaults(func=cmd_change_create)
+
+    # eval
+    sp = sub.add_parser("eval", help="Evaluation operations")
+    esub = sp.add_subparsers(dest="eval_command", required=True)
+    er = esub.add_parser("run", help="Run an evaluation suite")
+    er.add_argument("--suite", type=int, required=True)
+    er.add_argument("--version", type=int, required=True,
+                     help="asset_version_id")
+    er.add_argument("--change", type=int, help="change_request_id")
+    er.add_argument("--mock-outputs", help="JSON mapping case_name → output")
+    er.add_argument("--who", help="triggered_by")
+    _add_global_args(er)
+    er.set_defaults(func=cmd_eval_run)
+
+    # webhook
+    sp = sub.add_parser("webhook", help="Webhook operations")
+    wsub = sp.add_subparsers(dest="webhook_command", required=True)
+    wt = wsub.add_parser("test", help="Send a synthetic delivery to a subscription")
+    wt.add_argument("--id", type=int, required=True)
+    wt.add_argument("--event", help="event_type (default echo.test)")
+    wt.add_argument("--payload", help="JSON payload")
+    _add_global_args(wt)
+    wt.set_defaults(func=cmd_webhook_test)
+
+    wr = wsub.add_parser("redeliver", help="Retry a failed delivery")
+    wr.add_argument("--id", type=int, required=True)
+    _add_global_args(wr)
+    wr.set_defaults(func=cmd_webhook_redeliver)
+
+    # audit
+    sp = sub.add_parser("audit", help="Audit and compliance commands")
+    ausub = sp.add_subparsers(dest="audit_command", required=True)
+    aus = ausub.add_parser("summary", help="Audit summary (evidence matrix)")
+    _add_global_args(aus)
+    aus.set_defaults(func=cmd_audit_summary)
+    auv = ausub.add_parser("verify", help="Verify hash chain integrity")
+    _add_global_args(auv)
+    auv.set_defaults(func=cmd_audit_verify)
+
+    return p
+
+# =====================================================
+# Entry point
+# =====================================================
+def main(argv: Optional[list] = None) -> int:
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    try:
+        return int(args.func(args) or 0)
+    except EchoAPIError as exc:
+        print(f"API error: {exc}", file=sys.stderr)
+        return 2
+    except EchoError as exc:
+        print(f"Echo SDK error: {exc}", file=sys.stderr)
+        return 2
+    except KeyboardInterrupt:
+        print("Interrupted.", file=sys.stderr)
+        return 130
+
+if __name__ == "__main__":
+    sys.exit(main())
