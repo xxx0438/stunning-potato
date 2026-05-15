@@ -1,0 +1,41 @@
+services:
+  echo:
+    build: .
+    image: echo-agent-governance:latest
+    container_name: echo-agent-governance
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      # 默认 SQLite；要切 Postgres 取消下一行注释并启动 db service
+      # ECHO_DATABASE_URL: postgresql+psycopg2://echo:echo@db:5432/echo
+      ECHO_CORS_ORIGINS: "*"
+      ECHO_LOG_FORMAT: json
+      ECHO_LOG_LEVEL: INFO
+      ECHO_TELEMETRY_FLUSH_INTERVAL: "30"
+      ECHO_LOCK_CLEANUP_INTERVAL: "60"
+      ECHO_GITLAB_ALLOWED_HOSTS: "gitlab.com"
+      # GITLAB_TOKEN: ${GITLAB_TOKEN:-}
+      # GITLAB_WEBHOOK_SECRET: ${GITLAB_WEBHOOK_SECRET:-}
+      # DD_API_KEY: ${DD_API_KEY:-}
+      # DD_SITE: datadoghq.com
+    volumes:
+      - echo-data:/app/data
+    # depends_on:
+    #   - db
+
+  # db:
+  #   image: postgres:16-alpine
+  #   restart: unless-stopped
+  #   environment:
+  #     POSTGRES_USER: echo
+  #     POSTGRES_PASSWORD: echo
+  #     POSTGRES_DB: echo
+  #   volumes:
+  #     - echo-pg:/var/lib/postgresql/data
+  #   ports:
+  #     - "5432:5432"
+
+volumes:
+  echo-data:
+  # echo-pg:
