@@ -1,41 +1,71 @@
 services:
   echo:
     build: .
-    image: echo-agent-governance:latest
-    container_name: echo-agent-governance
+    image: echo-agent-governance:2.4
+    container_name: echo
     restart: unless-stopped
     ports:
       - "8000:8000"
     environment:
-      # 默认 SQLite；要切 Postgres 取消下一行注释并启动 db service
-      # ECHO_DATABASE_URL: postgresql+psycopg2://echo:echo@db:5432/echo
+      ECHO_AUTH_MODE: ${ECHO_AUTH_MODE:-demo}
+      ECHO_JWT_SECRET: ${ECHO_JWT_SECRET:-}
       ECHO_CORS_ORIGINS: "*"
       ECHO_LOG_FORMAT: json
-      ECHO_LOG_LEVEL: INFO
-      ECHO_TELEMETRY_FLUSH_INTERVAL: "30"
-      ECHO_LOCK_CLEANUP_INTERVAL: "60"
-      ECHO_GITLAB_ALLOWED_HOSTS: "gitlab.com"
-      # GITLAB_TOKEN: ${GITLAB_TOKEN:-}
-      # GITLAB_WEBHOOK_SECRET: ${GITLAB_WEBHOOK_SECRET:-}
-      # DD_API_KEY: ${DD_API_KEY:-}
-      # DD_SITE: datadoghq.com
-    volumes:
-      - echo-data:/app/data
-    # depends_on:
-    #   - db
+      ECHO_METRICS_ENABLED: "1"
+      ECHO_RATELIMIT_ENABLED: "1"
+      ECHO_HASHCHAIN_ENABLED: "1"
+      ECHO_OTEL_ENABLED: ${ECHO_OTEL_ENABLED:-0}
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      ECHO_DATABASE_URL: postgresql+psycopg2://echo:echo@db:5432/echo
+    depends_on:
+      db:
+        condition: service_healthy
 
-  # db:
-  #   image: postgres:16-alpine
-  #   restart: unless-stopped
-  #   environment:
-  #     POSTGRES_USER: echo
-  #     POSTGRES_PASSWORD: echo
-  #     POSTGRES_DB: echo
-  #   volumes:
-  #     - echo-pg:/var/lib/postgresql/data
-  #   ports:
-  #     - "5432:5432"
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: echo
+      POSTGRES_PASSWORD: echo
+      POSTGRES_DB: echo
+    volumes:
+      - echo-pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U echo"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # 可选：Prometheus 抓取
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    profiles: ["observability"]
+    volumes:
+      - ./deploy/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+
+  # 可选：Grafana
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    profiles: ["observability"]
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+
+  # 可选：OTel Collector
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    container_name: otel-collector
+    profiles: ["tracing"]
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./deploy/otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro
+    ports:
+      - "4318:4318"
 
 volumes:
-  echo-data:
-  # echo-pg:
+  echo-pg:
